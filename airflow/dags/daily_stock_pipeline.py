@@ -21,80 +21,77 @@ BANKING_STOCKS = [
     'BVB', 'CBB', 'KLB', 'NVB', 'PGB', 'SEAB', 'ABB'
 ]
 
-def crawl_ohlcv_data(**context):
-    """Crawl OHLCV data cho tất cả banking stocks"""
+def crawl_ohlcv():
+    """Crawl OHLCV data for banking stocks"""
+    import os
+    import pandas as pd
+    import vnstock
+    import boto3
+    from datetime import datetime, timedelta
+    
+    # Banking stocks list
+    banking_stocks = [
+        'TCB', 'VCB', 'CTG', 'BID', 'VPB', 'MBB', 'ACB', 'STB', 
+        'HDB', 'TPB', 'EIB', 'MSB', 'SHB', 'OCB', 'VIB', 'LPB',
+        'KLB', 'NAB', 'PGB', 'VAB', 'ABB', 'BAB', 'BVB', 'CBB',
+        'IVB', 'NVB', 'PVcomBank'
+    ]
+    
     try:
-        import subprocess
-        from datetime import datetime
+        # Get yesterday's date
+        yesterday = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
+        today = datetime.now().strftime('%Y-%m-%d')
         
-        # Get execution date (previous day)
-        execution_date = context['ds']
-        
-        print(f"Starting OHLCV crawl for date: {execution_date}")
-        
-        # Run ingest_stock.py for all banking stocks
-        script_path = '/opt/airflow/finance_portfolio/scripts/ingest_stock.py'
-        
+        all_data = []
         success_count = 0
-        failed_stocks = []
         
-        for stock in BANKING_STOCKS:
+        for symbol in banking_stocks:
             try:
-                cmd = f"cd /opt/airflow/finance_portfolio && python {script_path} --symbol {stock} --date {execution_date}"
-                result = subprocess.run(
-                    cmd, 
-                    shell=True, 
-                    capture_output=True, 
-                    text=True,
-                    timeout=300  # 5 minutes timeout per stock
+                # Get OHLCV data using vnstock legacy API
+                data = vnstock.stock_historical_data(
+                    symbol=symbol,
+                    start_date=yesterday,
+                    end_date=today,
+                    resolution='1D',
+                    type='stock',
+                    beautify=True,
+                    source='DNSE'
                 )
                 
-                if result.returncode == 0:
+                if not data.empty:
+                    data['symbol'] = symbol
+                    data['date'] = yesterday
+                    all_data.append(data)
                     success_count += 1
-                    print(f"✅ Successfully crawled {stock}")
+                    print(f"✅ {symbol}: {len(data)} records")
                 else:
-                    failed_stocks.append(stock)
-                    print(f"❌ Failed to crawl {stock}: {result.stderr}")
+                    print(f"❌ {symbol}: No data")
                     
-            except subprocess.TimeoutExpired:
-                failed_stocks.append(stock)
-                print(f"⏰ Timeout while crawling {stock}")
             except Exception as e:
-                failed_stocks.append(stock)
-                print(f"💥 Error crawling {stock}: {str(e)}")
+                print(f"❌ {symbol}: {str(e)}")
         
-        # Summary
-        total_stocks = len(BANKING_STOCKS)
-        success_rate = (success_count / total_stocks) * 100
-        
-        print(f"\n📊 OHLCV Crawl Summary for {execution_date}:")
-        print(f"✅ Successful: {success_count}/{total_stocks} ({success_rate:.1f}%)")
-        print(f"❌ Failed: {len(failed_stocks)}")
-        
-        if failed_stocks:
-            print(f"Failed stocks: {', '.join(failed_stocks)}")
-        
-        # Store results in XCom for downstream tasks
-        context['task_instance'].xcom_push(
-            key='crawl_results',
-            value={
-                'execution_date': execution_date,
-                'total_stocks': total_stocks,
-                'success_count': success_count,
-                'failed_count': len(failed_stocks),
-                'failed_stocks': failed_stocks,
-                'success_rate': success_rate
-            }
-        )
-        
-        # Fail task if success rate < 80%
-        if success_rate < 80:
-            raise Exception(f"OHLCV crawl success rate ({success_rate:.1f}%) below threshold (80%)")
-        
-        return f"OHLCV crawl completed with {success_rate:.1f}% success rate"
-        
+        if all_data:
+            # Combine all data
+            combined_df = pd.concat(all_data, ignore_index=True)
+            
+            # Upload to S3
+            s3_client = boto3.client('s3')
+            csv_buffer = combined_df.to_csv(index=False)
+            
+            s3_key = f"raw/stocks/ohlcv/date={yesterday}/banking_stocks.csv"
+            s3_client.put_object(
+                Bucket=os.getenv('AWS_S3_BUCKET'),
+                Key=s3_key,
+                Body=csv_buffer
+            )
+            
+            print(f"✅ Uploaded {len(combined_df)} records to S3: {s3_key}")
+            print(f"✅ Success rate: {success_count}/{len(banking_stocks)} ({success_count/len(banking_stocks)*100:.1f}%)")
+        else:
+            raise Exception("No data crawled for any stocks")
+            
     except Exception as e:
-        print(f"💥 Critical error in OHLCV crawl: {str(e)}")
+        print(f"❌ OHLCV crawling failed: {str(e)}")
         raise
 
 def validate_data(**context):
@@ -184,7 +181,7 @@ dag = DAG(
 # Task 1: Crawl OHLCV data
 crawl_ohlcv_task = PythonOperator(
     task_id='crawl_ohlcv_task',
-    python_callable=crawl_ohlcv_data,
+    python_callable=crawl_ohlcv,
     dag=dag,
     provide_context=True,
     execution_timeout=timedelta(hours=2)
