@@ -1,0 +1,25 @@
+# Core
+boto3==1.34.122           # AWS SDK để làm việc với S3
+requests==2.32.3          # Gọi HTTP API (Vietstock, crawl news)
+python-dotenv==1.0.1      # Load biến môi trường từ file .env
+
+# Data processing
+pandas==2.2.2             # Xử lý dữ liệu, CSV/JSON
+numpy==1.26.4             # Toán học cơ bản
+vnstock==0.2.9.6          # Vietnam stock market data
+
+# Database
+psycopg2-binary==2.9.9    # Kết nối PostgreSQL (nếu bạn lưu metadata DB)
+
+# Logging & retry
+tenacity==9.0.0           # Retry với backoff (API call)
+loguru==0.7.2             # Logging đẹp và tiện
+
+# Airflow (sau này orchestration)
+apache-airflow==2.9.2     # Core Airflow
+apache-airflow-providers-amazon==8.18.0   # Airflow + AWS S3
+apache-airflow-providers-postgres==5.10.0 # Airflow + PostgreSQL
+
+# (Tùy chọn: crawl news nâng cao)
+beautifulsoup4==4.12.3    # Parse HTML
+lxml==5.2.2               # Parser nhanh hơn cho BeautifulSoup
