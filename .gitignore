@@ -60,7 +60,6 @@ coverage.xml
 *.onnx
 checkpoints/
 models/
-data/
 logs/
 tensorboard/
 wandb/
@@ -256,7 +255,6 @@ dmypy.json
 # AI/ML specific
 models/
 checkpoints/
-data/
 logs/
 tensorboard/
 wandb/
