@@ -1,9 +1,10 @@
 # 📅 Development Journal - Day 01
 **Date:** September 20, 2025  
-**Focus:** Vietnamese Banking Stocks OHLCV Data Pipeline Development
+**Focus:** Vietnamese Banking Data Pipeline Development (OHLCV + News)
 
-## 🎯 Objective
-Phát triển script Python để crawl dữ liệu OHLCV (Open, High, Low, Close, Volume) hàng ngày cho các cổ phiếu ngân hàng Việt Nam và upload lên AWS S3 bucket, chuẩn bị cho việc tích hợp vào Airflow DAGs.
+## 🎯 Objectives
+1. **OHLCV Pipeline:** Phát triển script crawl dữ liệu OHLCV hàng ngày cho 27 cổ phiếu ngân hàng VN
+2. **News Pipeline:** Phát triển script crawl tin tức ngân hàng từ các báo uy tín và phân tích sentiment
 
 ## 📋 Tasks Completed
 
@@ -132,28 +133,110 @@ python scripts/ingest_stock.py --symbol VCB --date 2024-09-19
 ```bash
 python scripts/ingest_stock.py --test-s3
 ```
-**Result:** ⚠️ 403 Forbidden - cần update AWS permissions
+**Result:** ✅ S3 connection successful (đã fix permissions)
+
+## 🗞️ PART 2: NEWS CRAWLER DEVELOPMENT
+
+### 7. 📰 Phân tích News Pipeline Notebook
+- **File:** `data/jupyter_files/VN_News_Complete_Pipeline.ipynb`
+- **Key Components:**
+  - Comprehensive banking keywords (6 categories, 100+ terms)
+  - Multi-source scraping (vneconomy, vnexpress, cafef, thoibaotaichinhvietnam)
+  - BeautifulSoup-based web scraping
+  - Basic sentiment analysis
+  - Error handling và retry logic
+
+### 8. 🔧 News Crawler Implementation
+- **File:** `scripts/ingest_news.py`
+- **Features:**
+  - Class-based architecture với lazy loading
+  - Configurable scraping parameters
+  - Banking keyword filtering
+  - Sentiment scoring (-1.0 to 1.0)
+  - AWS S3 integration với fallback local storage
+
+#### News Data Structure
+```json
+{
+  "article_id": "03c5cdd383f8",
+  "published_at": "2024-09-19",
+  "source": "vneconomy.vn",
+  "title": "SeABank khẳng định dấu ân bền vững...",
+  "content": "Nội dung bài báo...",
+  "sentiment_score": 1.0,
+  "url": "https://vneconomy.vn/seabank-khang-dinh...",
+  "scraped_at": "2025-09-20T11:57:04.782811"
+}
+```
+
+#### News S3 Partition Strategy
+```
+s3://bankanalystportfolio/raw/news/source={source}/date={YYYY-MM-DD}/{article_id}.json
+```
+
+**Examples:**
+```
+s3://bankanalystportfolio/raw/news/source=vneconomy_vn/date=2024-09-19/03c5cdd383f8.json
+s3://bankanalystportfolio/raw/news/source=vnexpress_net/date=2024-09-19/841569beb106.json
+```
+
+### 9. 🧪 News Crawler Testing
+#### CLI Interface Test
+```bash
+python scripts/ingest_news.py --help
+```
+**Result:** ✅ Full CLI với options cho date, max-pages, max-articles, test-s3
+
+#### S3 Connection Test
+```bash
+python scripts/ingest_news.py --test-s3
+```
+**Result:** ✅ S3 connection successful
+
+#### Production Crawl Test
+```bash
+python scripts/ingest_news.py --max-pages 2 --max-articles 5 --date 2024-09-19
+```
+**Result:** ✅ Successfully crawled 16 articles và upload 100% thành công
+
+### 10. 📊 News Sources Coverage
+```python
+NEWS_SITES = {
+    'vneconomy.vn': ['ngan-hang', 'tai-chinh', 'dau-tu', 'thi-truong'],
+    'vnexpress.net': ['kinh-doanh/ngan-hang', 'kinh-doanh'],
+    'cafef.vn': ['tai-chinh-ngan-hang', 'thi-truong-chung-khoan'],
+    'thoibaotaichinhvietnam.vn': ['ngan-hang', 'tai-chinh']
+}
+```
 
 ## 🔄 Next Steps (Day 02)
-1. **AWS Permissions:** Fix S3 bucket permissions cho production upload
-2. **Airflow Integration:** Convert script thành Airflow DAG
-3. **Monitoring:** Add logging và alerting
-4. **Scheduling:** Setup daily cron job
-5. **Data Validation:** Add quality checks cho crawled data
+1. **Airflow Integration:** Convert cả 2 scripts thành Airflow DAGs
+2. **Data Pipeline:** Setup ETL pipeline từ raw → processed → analytics
+3. **Monitoring:** Add comprehensive logging và alerting
+4. **Scheduling:** Setup daily automated runs
+5. **Sentiment Analysis:** Enhance với ML models
+6. **Data Quality:** Add validation và cleansing steps
 
-## 🏗️ Architecture Overview
+## 🏗️ Complete Architecture Overview
 ```
-[vnstock API] → [Python Script] → [S3 Bucket] → [Future: Airflow DAG]
-     ↓              ↓               ↓
-[Stock Data] → [JSON Format] → [Partitioned Storage]
+[vnstock API] → [OHLCV Script] ↘
+                                  → [S3 Raw Data] → [Future: ETL Pipeline] → [Analytics]
+[News Websites] → [News Script] ↗
 ```
 
-## 📊 Success Metrics
+## 📊 Final Success Metrics
+### OHLCV Pipeline
 - ✅ Script hoạt động với 27 banking stocks
 - ✅ Proper error handling và retry logic
 - ✅ CLI interface hoàn chỉnh
-- ✅ Fallback mechanism hoạt động
-- ⚠️ S3 upload cần fix permissions
+- ✅ S3 upload working perfectly
+
+### News Pipeline  
+- ✅ Multi-source news scraping (4 major VN financial news sites)
+- ✅ Banking keyword filtering (100+ keywords, 6 categories)
+- ✅ Sentiment analysis integration
+- ✅ Scalable S3 partition structure
+- ✅ 100% successful upload rate trong testing
 
 ---
 **Next Review:** Day 02 - AWS Integration & Airflow DAG Development
