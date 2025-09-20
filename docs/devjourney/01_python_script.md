@@ -238,5 +238,86 @@ NEWS_SITES = {
 - ✅ Scalable S3 partition structure
 - ✅ 100% successful upload rate trong testing
 
+## 🆕 PART 3: LOGGING SYSTEM INTEGRATION
+
+### 11. 📝 Enhanced Logging Utility
+- **File:** `utils/logger.py`
+- **Features:**
+  - Centralized logging cho cả OHLCV và News pipelines
+  - AWS S3 integration với fallback local storage
+  - Structured JSON logs với detailed metadata
+  - Automatic partitioning theo date và log type
+
+#### Logging Structure
+```
+s3://bankanalystportfolio/logs/{log_type}/date={YYYY-MM-DD}/{identifier}_{timestamp}.json
+```
+
+**Examples:**
+```
+s3://bankanalystportfolio/logs/ohlcv/date=2025-09-20/VCB_1758325239.json
+s3://bankanalystportfolio/logs/news/date=2025-09-20/all_sources_1758325303.json
+```
+
+### 12. 📊 OHLCV Logging Implementation
+#### Single Stock Log Sample:
+```json
+{
+  "script": "ingest_stock.py",
+  "symbol": "VCB",
+  "target_date": "2024-09-19",
+  "status": "success",
+  "execution_time": "2025-09-20T06:40:39.238459",
+  "details": {
+    "execution_time_seconds": 0.848,
+    "attempts": 1,
+    "data_quality": "complete",
+    "ohlcv_summary": {
+      "open": 60.87,
+      "close": 61.2,
+      "volume": 1346904
+    }
+  },
+  "log_type": "ohlcv"
+}
+```
+
+### 13. 📰 News Logging Implementation  
+#### News Execution Log Sample:
+```json
+{
+  "script": "ingest_news.py",
+  "target_date": "2024-09-19",
+  "status": "success",
+  "execution_time": "2025-09-20T06:41:43.983660",
+  "details": {
+    "total_articles": 4,
+    "successful_uploads": 4,
+    "failed_uploads": 0,
+    "execution_time_seconds": 17.05,
+    "sources_stats": {
+      "vneconomy.vn": 0,
+      "vnexpress.net": 1,
+      "cafef.vn": 0,
+      "thoibaotaichinhvietnam.vn": 3
+    },
+    "success_rate": 100.0,
+    "config": {
+      "max_pages_per_site": 1,
+      "max_articles_per_page": 3
+    }
+  },
+  "log_type": "news"
+}
+```
+
+### 14. 🔧 Logging Integration Benefits
+- **Traceability:** Mỗi execution đều có log chi tiết
+- **Performance Monitoring:** Tracking execution time và success rate
+- **Error Tracking:** Chi tiết lỗi và attempts
+- **Configuration Tracking:** Lưu config parameters
+- **Data Quality:** Summary của data quality metrics
+- **Audit Trail:** Complete history của tất cả executions
+
 ---
 **Next Review:** Day 02 - AWS Integration & Airflow DAG Development

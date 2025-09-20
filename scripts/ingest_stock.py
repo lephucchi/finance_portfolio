@@ -1,4 +1,5 @@
 import os
+import sys
 from dotenv import load_dotenv
 import boto3
 import requests
@@ -7,6 +8,10 @@ import pandas as pd
 import time
 import json
 from vnstock import Vnstock
+
+# Add utils to path for logging
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'utils'))
+from logger import log_ohlcv_execution
 
 # Load secrets từ file .env
 load_dotenv()
@@ -131,6 +136,7 @@ def get_stock_data_daily(symbol: str, target_date: str = None, retries: int = 3,
     if target_date is None:
         target_date = datetime.date.today().strftime("%Y-%m-%d")
     
+    start_time = time.time()
     stock = Vnstock().stock(symbol=symbol, source='VCI')
     
     for attempt in range(retries):
@@ -139,7 +145,21 @@ def get_stock_data_daily(symbol: str, target_date: str = None, retries: int = 3,
             df = stock.quote.history(start=target_date, end=target_date, interval='1D')
             
             if df.empty:
-                print(f"⚠️  Không có dữ liệu cho {symbol} ngày {target_date}")
+                error_msg = f"Không có dữ liệu cho {symbol} ngày {target_date}"
+                print(f"⚠️  {error_msg}")
+                
+                # Log failed attempt
+                log_ohlcv_execution(
+                    symbol=symbol,
+                    target_date=target_date,
+                    status="failed",
+                    error=error_msg,
+                    details={
+                        "execution_time_seconds": time.time() - start_time,
+                        "attempts": attempt + 1,
+                        "reason": "no_data_available"
+                    }
+                )
                 return None
             
             # Xử lý dữ liệu
@@ -161,13 +181,44 @@ def get_stock_data_daily(symbol: str, target_date: str = None, retries: int = 3,
                 'timestamp': datetime.datetime.now().isoformat()
             }
             
+            # Log successful execution
+            log_ohlcv_execution(
+                symbol=symbol,
+                target_date=target_date,
+                status="success",
+                details={
+                    "execution_time_seconds": time.time() - start_time,
+                    "attempts": attempt + 1,
+                    "data_quality": "complete",
+                    "ohlcv_summary": {
+                        "open": result['open'],
+                        "close": result['close'],
+                        "volume": result['volume']
+                    }
+                }
+            )
+            
             return result
             
         except Exception as e:
-            print(f"⚠️  Lỗi khi lấy dữ liệu cho {symbol} (lần {attempt+1}/{retries}): {e}")
+            error_msg = f"Lỗi khi lấy dữ liệu cho {symbol} (lần {attempt+1}/{retries}): {e}"
+            print(f"⚠️  {error_msg}")
+            
             if attempt < retries - 1:
                 time.sleep(delay)
             else:
+                # Log final failure
+                log_ohlcv_execution(
+                    symbol=symbol,
+                    target_date=target_date,
+                    status="failed",
+                    error=str(e),
+                    details={
+                        "execution_time_seconds": time.time() - start_time,
+                        "attempts": retries,
+                        "reason": "api_error"
+                    }
+                )
                 print(f"❌ Không thể lấy dữ liệu cho {symbol} sau {retries} lần thử")
                 return None
 
@@ -183,8 +234,11 @@ def crawl_banking_stocks_ohlcv(target_date: str = None):
     
     print(f"🚀 Bắt đầu crawl dữ liệu OHLCV cho {len(BANKING_STOCKS)} cổ phiếu ngân hàng ngày {target_date}")
     
+    start_time = time.time()
     successful_uploads = 0
     failed_uploads = 0
+    successful_symbols = []
+    failed_symbols = []
     
     for symbol in BANKING_STOCKS:
         print(f"📊 Đang xử lý {symbol}...")
@@ -203,17 +257,39 @@ def crawl_banking_stocks_ohlcv(target_date: str = None):
             if upload_to_s3(json_data, s3_key):
                 print(f"✅ Đã upload {symbol} lên S3: {s3_key}")
                 successful_uploads += 1
+                successful_symbols.append(symbol)
             else:
                 failed_uploads += 1
+                failed_symbols.append(symbol)
         else:
             failed_uploads += 1
+            failed_symbols.append(symbol)
         
         # Nghỉ ngắn để tránh rate limit
         time.sleep(1)
     
+    execution_time = time.time() - start_time
+    
     print(f"\n📈 Kết quả crawl:")
     print(f"   ✅ Thành công: {successful_uploads}/{len(BANKING_STOCKS)}")
     print(f"   ❌ Thất bại: {failed_uploads}/{len(BANKING_STOCKS)}")
+    
+    # Log overall execution
+    status = "success" if failed_uploads == 0 else ("partial" if successful_uploads > 0 else "failed")
+    log_ohlcv_execution(
+        symbol="all_stocks",
+        target_date=target_date,
+        status=status,
+        details={
+            "total_stocks": len(BANKING_STOCKS),
+            "successful_uploads": successful_uploads,
+            "failed_uploads": failed_uploads,
+            "execution_time_seconds": execution_time,
+            "successful_symbols": successful_symbols,
+            "failed_symbols": failed_symbols,
+            "success_rate": (successful_uploads / len(BANKING_STOCKS)) * 100
+        }
+    )
     
     return successful_uploads, failed_uploads
 

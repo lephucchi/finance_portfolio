@@ -1,4 +1,5 @@
 import os
+import sys
 from dotenv import load_dotenv
 import boto3
 import requests
@@ -13,6 +14,11 @@ from datetime import datetime
 import random
 import argparse
 import warnings
+
+# Add utils to path for logging
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'utils'))
+from logger import log_news_execution
+
 warnings.filterwarnings('ignore')
 
 # Load secrets từ file .env
@@ -392,15 +398,18 @@ class VietnamBankingNewsScraper:
         
         start_time = time.time()
         all_articles = []
+        sources_stats = {}
         
         for site_name, site_config in NEWS_SITES.items():
             try:
                 articles = self.scrape_website(site_name, site_config)
                 all_articles.extend(articles)
+                sources_stats[site_name] = len(articles)
                 print(f"📊 {site_name}: {len(articles)} bài báo")
                 
             except Exception as e:
                 print(f"❌ Lỗi scraping {site_name}: {e}")
+                sources_stats[site_name] = 0
         
         end_time = time.time()
         duration = end_time - start_time
@@ -411,9 +420,40 @@ class VietnamBankingNewsScraper:
         
         # Upload từng bài lên S3
         if all_articles:
-            return self.upload_articles_to_s3(all_articles, target_date)
+            successful_uploads, failed_uploads = self.upload_articles_to_s3(all_articles, target_date)
+            
+            # Log execution
+            status = "success" if failed_uploads == 0 else ("partial" if successful_uploads > 0 else "failed")
+            log_news_execution(
+                target_date=target_date,
+                status=status,
+                details={
+                    "total_articles": len(all_articles),
+                    "successful_uploads": successful_uploads,
+                    "failed_uploads": failed_uploads,
+                    "execution_time_seconds": duration,
+                    "sources_stats": sources_stats,
+                    "success_rate": (successful_uploads / len(all_articles)) * 100 if all_articles else 0,
+                    "config": self.config
+                }
+            )
+            
+            return successful_uploads, failed_uploads
         else:
             print("❌ Không thu thập được bài báo nào!")
+            
+            # Log failed execution
+            log_news_execution(
+                target_date=target_date,
+                status="failed",
+                error="Không thu thập được bài báo nào",
+                details={
+                    "execution_time_seconds": duration,
+                    "sources_stats": sources_stats,
+                    "config": self.config
+                }
+            )
+            
             return 0, 0
     
     def upload_articles_to_s3(self, articles, target_date):
