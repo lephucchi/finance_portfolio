@@ -6,7 +6,7 @@ python-dotenv==1.0.1      # Load biến môi trường từ file .env
 # Data processing
 pandas==2.2.2             # Xử lý dữ liệu, CSV/JSON
 numpy==1.26.4             # Toán học cơ bản
-vnstock==0.2.9.6          # Vietnam stock market data
+vnstock==0.2.9.2.3          # Vietnam stock market data (compatible with Python 3.9)
 
 # Database
 psycopg2-binary==2.9.9    # Kết nối PostgreSQL (nếu bạn lưu metadata DB)
@@ -14,6 +14,13 @@ psycopg2-binary==2.9.9    # Kết nối PostgreSQL (nếu bạn lưu metadata DB
 # Logging & retry
 tenacity==9.0.0           # Retry với backoff (API call)
 loguru==0.7.2             # Logging đẹp và tiện
+
+# Additional dependencies for vnstock
+ipython==8.18.1           # Required by vnstock
+matplotlib==3.9.4         # Charts & visualization
+seaborn==0.13.2           # Statistical visualization
+beautifulsoup4==4.12.3    # HTML parsing for news crawling
+textblob==0.17.1          # Text processing & sentiment analysis
 
 # Airflow (sau này orchestration)
 apache-airflow==2.9.2     # Core Airflow

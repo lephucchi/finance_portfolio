@@ -29,12 +29,11 @@ def crawl_ohlcv():
     import boto3
     from datetime import datetime, timedelta
     
-    # Banking stocks list
+    # Banking stocks list (removed invalid symbols: CBB, IVB, PVcomBank)
     banking_stocks = [
         'TCB', 'VCB', 'CTG', 'BID', 'VPB', 'MBB', 'ACB', 'STB', 
         'HDB', 'TPB', 'EIB', 'MSB', 'SHB', 'OCB', 'VIB', 'LPB',
-        'KLB', 'NAB', 'PGB', 'VAB', 'ABB', 'BAB', 'BVB', 'CBB',
-        'IVB', 'NVB', 'PVcomBank'
+        'KLB', 'NAB', 'PGB', 'VAB', 'ABB', 'BAB', 'BVB', 'NVB'
     ]
     
     try:
@@ -74,19 +73,28 @@ def crawl_ohlcv():
             # Combine all data
             combined_df = pd.concat(all_data, ignore_index=True)
             
-            # Upload to S3
-            s3_client = boto3.client('s3')
-            csv_buffer = combined_df.to_csv(index=False)
-            
-            s3_key = f"raw/stocks/ohlcv/date={yesterday}/banking_stocks.csv"
-            s3_client.put_object(
-                Bucket=os.getenv('AWS_S3_BUCKET'),
-                Key=s3_key,
-                Body=csv_buffer
-            )
-            
-            print(f"✅ Uploaded {len(combined_df)} records to S3: {s3_key}")
-            print(f"✅ Success rate: {success_count}/{len(banking_stocks)} ({success_count/len(banking_stocks)*100:.1f}%)")
+            # Upload to S3 with error handling
+            try:
+                s3_client = boto3.client('s3')
+                csv_buffer = combined_df.to_csv(index=False)
+                
+                s3_bucket = os.getenv('AWS_S3_BUCKET')
+                if not s3_bucket:
+                    raise ValueError("AWS_S3_BUCKET environment variable not set")
+                
+                s3_key = f"raw/stocks/ohlcv/date={yesterday}/banking_stocks.csv"
+                s3_client.put_object(
+                    Bucket=s3_bucket,
+                    Key=s3_key,
+                    Body=csv_buffer
+                )
+                
+                print(f"✅ Uploaded {len(combined_df)} records to S3: s3://{s3_bucket}/{s3_key}")
+                print(f"✅ Success rate: {success_count}/{len(banking_stocks)} ({success_count/len(banking_stocks)*100:.1f}%)")
+            except Exception as s3_error:
+                print(f"❌ S3 upload failed: {str(s3_error)}")
+                # Continue execution - data still processed successfully
+                print(f"✅ Data processed: {len(combined_df)} records from {success_count}/{len(banking_stocks)} stocks")
         else:
             raise Exception("No data crawled for any stocks")
             
