@@ -106,23 +106,21 @@ def validate_data(**context):
     """Validate crawled OHLCV data"""
     try:
         import boto3
-        from datetime import datetime
+        import os
+        from datetime import datetime, timedelta
         
-        execution_date = context['ds']
-        crawl_results = context['task_instance'].xcom_pull(
-            task_ids='crawl_ohlcv_task',
-            key='crawl_results'
-        )
+        # Get yesterday's date (same as crawl task)
+        yesterday = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
         
-        print(f"🔍 Validating OHLCV data for {execution_date}")
+        print(f"🔍 Validating OHLCV data for {yesterday}")
         
         # Check S3 for uploaded files
         s3_client = boto3.client('s3')
-        bucket_name = 'bankanalystportfolio'
+        bucket_name = os.getenv('AWS_S3_BUCKET', 'bankanalystportfolio')
         
         uploaded_files = []
         try:
-            prefix = f"raw/ohlcv/date={execution_date}/"
+            prefix = f"raw/stocks/ohlcv/date={yesterday}/"
             response = s3_client.list_objects_v2(
                 Bucket=bucket_name,
                 Prefix=prefix
@@ -137,23 +135,27 @@ def validate_data(**context):
         except Exception as e:
             print(f"❌ Error checking S3: {str(e)}")
         
-        # Validation summary
-        expected_files = crawl_results['success_count']
+        # Validation summary - estimate expected files
+        # We know we have 24 valid banking stocks, expect 1 combined file
+        expected_files = 1  # Combined CSV file
         actual_files = len(uploaded_files)
         
         print(f"\n📊 Data Validation Summary:")
         print(f"Expected files: {expected_files}")
         print(f"Actual files: {actual_files}")
-        print(f"Match: {'✅' if expected_files == actual_files else '❌'}")
+        print(f"Validation date: {yesterday}")
+        print(f"S3 bucket: {bucket_name}")
+        print(f"S3 prefix: {prefix}")
+        print(f"Match: {'✅' if actual_files >= expected_files else '❌'}")
         
         # Store validation results
         context['task_instance'].xcom_push(
             key='validation_results',
             value={
-                'execution_date': execution_date,
+                'validation_date': yesterday,
                 'expected_files': expected_files,
                 'actual_files': actual_files,
-                'files_match': expected_files == actual_files,
+                'files_match': actual_files >= expected_files,
                 'uploaded_files': uploaded_files
             }
         )
@@ -163,6 +165,62 @@ def validate_data(**context):
     except Exception as e:
         print(f"💥 Error in data validation: {str(e)}")
         raise
+
+def save_logs_to_s3(**context):
+    """Save execution logs to S3"""
+    try:
+        import boto3
+        import os
+        import json
+        from datetime import datetime, timedelta
+        
+        # Get yesterday's date
+        yesterday = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
+        
+        # Get validation results from previous task
+        validation_results = context['task_instance'].xcom_pull(
+            task_ids='validate_data_task',
+            key='validation_results'
+        )
+        
+        # Create log summary
+        log_summary = {
+            'pipeline': 'daily_stock_ohlcv',
+            'execution_date': yesterday,
+            'execution_timestamp': datetime.now().isoformat(),
+            'dag_run_id': context['dag_run'].run_id,
+            'validation_results': validation_results,
+            'status': 'success' if validation_results and validation_results.get('files_match', False) else 'partial',
+            'banking_stocks_count': 24,
+            'data_source': 'vnstock',
+            's3_bucket': os.getenv('AWS_S3_BUCKET', 'bankanalystportfolio')
+        }
+        
+        print(f"📝 Creating execution log for {yesterday}")
+        print(f"Status: {log_summary['status']}")
+        print(f"Files validated: {validation_results.get('actual_files', 0) if validation_results else 0}")
+        
+        # Save to S3
+        s3_client = boto3.client('s3')
+        bucket_name = os.getenv('AWS_S3_BUCKET', 'bankanalystportfolio')
+        
+        log_key = f"logs/ohlcv/date={yesterday}/execution_log_{context['dag_run'].run_id.replace(':', '_')}.json"
+        
+        s3_client.put_object(
+            Bucket=bucket_name,
+            Key=log_key,
+            Body=json.dumps(log_summary, indent=2),
+            ContentType='application/json'
+        )
+        
+        print(f"✅ Execution log saved to S3: s3://{bucket_name}/{log_key}")
+        
+        return f"Logs saved successfully for {yesterday}"
+        
+    except Exception as e:
+        print(f"❌ Error saving logs to S3: {str(e)}")
+        # Don't fail the entire pipeline for logging issues
+        return f"Warning: Log save failed - {str(e)}"
 
 # Default arguments
 default_args = {
@@ -204,7 +262,16 @@ validate_data_task = PythonOperator(
     execution_timeout=timedelta(minutes=10)
 )
 
-# Task 3: Health check
+# Task 3: Save logs to S3
+save_logs_task = PythonOperator(
+    task_id='save_logs_task',
+    python_callable=save_logs_to_s3,
+    dag=dag,
+    provide_context=True,
+    execution_timeout=timedelta(minutes=5)
+)
+
+# Task 4: Health check
 health_check_task = BashOperator(
     task_id='health_check_task',
     bash_command="""
@@ -218,4 +285,4 @@ health_check_task = BashOperator(
 )
 
 # Task dependencies
-crawl_ohlcv_task >> validate_data_task >> health_check_task
+crawl_ohlcv_task >> validate_data_task >> save_logs_task >> health_check_task
