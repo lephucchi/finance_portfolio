@@ -98,3 +98,59 @@ It integrates stock OHLCV data, financial reports, and news sentiment analysis t
 - Documentation for setup and usage.
 - CI/CD pipelines with production-ready deployment.
 
+                  ┌──────────────────────────────────────────────────┐
+                  │                🏦 Data Sources                    │
+                  │──────────────────────────────────────────────────│
+                  │ • Vietstock API (OHLCV, financial reports)       │
+                  │ • Financial News Crawler                         │
+                  │ • Macroeconomic Data (SBV, GSO, IMF...)          │
+                  └──────────────────────────────────────────────────┘
+                                       │
+                                       ▼
+             ┌─────────────────────────────────────────────┐
+             │           🪣 AWS S3 – Data Lake (Bronze)     │
+             │─────────────────────────────────────────────│
+             │ Raw data stored by category:                │
+             │  - /bronze/stocks/                         │
+             │  - /bronze/news/                           │
+             │  - /bronze/macro/                          │
+             └─────────────────────────────────────────────┘
+                                       │
+                                       ▼
+             ┌─────────────────────────────────────────────┐
+             │       ⚙️ Databricks – Silver Layer           │
+             │─────────────────────────────────────────────│
+             │  - Clean & Normalize Data                    │
+             │  - Schema Unification                        │
+             │  - Convert to Delta Format                   │
+             │  Output: /silver/stocks, /silver/news ...    │
+             └─────────────────────────────────────────────┘
+                                       │
+                                       ▼
+             ┌─────────────────────────────────────────────┐
+             │       🧠 Databricks – Gold Layer (DW)        │
+             │─────────────────────────────────────────────│
+             │  Star Schema:                               │
+             │   • dim_company, dim_industry, dim_date      │
+             │   • fact_stock_prices, fact_macro, fact_sent │
+             │  Optimized Delta Tables                      │
+             └─────────────────────────────────────────────┘
+                                       │
+                                       ▼
+             ┌─────────────────────────────────────────────┐
+             │      🔍 Databricks SQL Endpoint              │
+             │─────────────────────────────────────────────│
+             │  - Query-ready tables                        │
+             │  - Connect to BI or Backend APIs             │
+             └─────────────────────────────────────────────┘
+                                       │
+                                       ▼
+     ┌──────────────────────────┬────────────────────────────┐
+     │ 📊 BI Dashboard (Metabase)│ 🧩 Backend Microservices   │
+     │  - Finance visualization  │  - AI Agent / API          │
+     │  - Sector analysis        │  - Chatbot, report engine  │
+     └──────────────────────────┴────────────────────────────┘
+                                       │
+                                       ▼
+                        💻 React/Next.js Frontend
+                  (Interactive dashboard + Chatbot)
