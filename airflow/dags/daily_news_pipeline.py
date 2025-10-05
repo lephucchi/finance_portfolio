@@ -34,7 +34,7 @@ def crawl_news_data(**context):
         print(f"📰 Starting News crawl for date: {execution_date}")
         
         # Run ingest_news.py 
-        script_path = '/opt/airflow/finance_portfolio/scripts/ingest_news.py'
+        script_path = '/opt/airflow/scripts/ingest_news.py'
         
         try:
             cmd = f"cd /opt/airflow/finance_portfolio && python {script_path} --date {execution_date} --max-pages 3 --max-articles 10"
