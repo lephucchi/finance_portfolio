@@ -25,6 +25,22 @@ x-airflow-common:
     AWS_S3_BUCKET: ${S3_BUCKET:-bankanalystportfolio}
     # Python path
     PYTHONPATH: '/opt/airflow/finance_portfolio'
+    # Spark configurations
+    SPARK_HOME: '/opt/spark'
+    JAVA_HOME: '/usr/lib/jvm/java-11-openjdk-amd64'
+    PYSPARK_PYTHON: 'python3'
+    PYSPARK_DRIVER_PYTHON: 'python3'
+    # Production optimizations (Phase 1)
+    AIRFLOW__CORE__MAX_ACTIVE_RUNS_PER_DAG: 1
+    AIRFLOW__CORE__PARALLELISM: 32
+    AIRFLOW__CORE__MAX_ACTIVE_TASKS_PER_DAG: 16
+    AIRFLOW__SCHEDULER__DAG_DIR_LIST_INTERVAL: 300
+    AIRFLOW__WEBSERVER__EXPOSE_CONFIG: 'true'
+    AIRFLOW__LOGGING__LOGGING_LEVEL: ${AIRFLOW_LOGGING_LEVEL:-INFO}
+    # Task execution optimizations
+    AIRFLOW__CELERY__WORKER_CONCURRENCY: 16
+    AIRFLOW__SCHEDULER__CATCHUP_BY_DEFAULT: 'false'
+    AIRFLOW__SCHEDULER__MAX_TIS_PER_QUERY: 512
   volumes:
     - ${AIRFLOW_PROJ_DIR:-.}/airflow/dags:/opt/airflow/dags
     - ${AIRFLOW_PROJ_DIR:-.}/airflow/logs:/opt/airflow/logs
