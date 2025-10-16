@@ -55,31 +55,61 @@ def process_stock_data(**context):
         bucket_name = os.getenv('S3_BUCKET', 'bankanalystportfolio')
         
         try:
-            # Read raw stock data
-            stock_file_key = f"bronze/stocks/raw/stocks_{date_str}.json"
+            # Read multiple JSON files from bronze/stocks/raw/{ticker}/ structure
+            logging.info("📈 Reading stock data from Bronze layer...")
             
-            if not s3_hook.check_for_key(key=stock_file_key, bucket_name=bucket_name):
-                logging.warning(f"⚠️ No stock data found for {date_str}")
+            # Get list of stock files from Bronze layer (individual JSON files per ticker/date)
+            bronze_stock_files = []
+            try:
+                # List all objects in bronze/stocks/raw/ to find ticker folders
+                paginator = s3_hook.get_session().client('s3').get_paginator('list_objects_v2')
+                for page in paginator.paginate(Bucket=bucket_name, Prefix="bronze/stocks/raw/"):
+                    if 'Contents' in page:
+                        for obj in page['Contents']:
+                            if obj['Key'].endswith('.json') and date_str in obj['Key']:
+                                bronze_stock_files.append(obj['Key'])
+                
+                logging.info(f"📊 Found {len(bronze_stock_files)} stock files for {date_str}")
+                
+            except Exception as list_error:
+                logging.error(f"❌ Error listing bronze stock files: {str(list_error)}")
                 return {'stocks_processed': 0, 'execution_date': date_str}
             
-            stock_content = s3_hook.read_key(key=stock_file_key, bucket_name=bucket_name)
-            stock_data = json.loads(stock_content)
-            
-            stocks = stock_data.get('stocks', [])
-            if len(stocks) == 0:
-                logging.warning(f"⚠️ No stocks to process")
+            if len(bronze_stock_files) == 0:
+                logging.warning(f"⚠️ No stock files found for {date_str}")
                 return {'stocks_processed': 0, 'execution_date': date_str}
             
-            logging.info(f"💹 Processing {len(stocks)} stock records")
+            # Read and combine all stock JSON files
+            all_stocks = []
+            for file_key in bronze_stock_files:
+                try:
+                    file_content = s3_hook.read_key(key=file_key, bucket_name=bucket_name)
+                    stock_record = json.loads(file_content)
+                    all_stocks.append(stock_record)
+                except Exception as file_error:
+                    logging.warning(f"⚠️ Error reading {file_key}: {str(file_error)}")
+                    continue
+            
+            if len(all_stocks) == 0:
+                logging.error(f"❌ No valid stock data found for {date_str}")
+                return {'stocks_processed': 0, 'execution_date': date_str}
+            
+            logging.info(f"💹 Processing {len(all_stocks)} stock records")
             
             # Convert to DataFrame
-            stocks_df = pd.DataFrame(stocks)
+            stocks_df = pd.DataFrame(all_stocks)
+            
+            # Ensure required columns exist and are properly typed
+            expected_columns = ['ticker', 'date', 'open', 'high', 'low', 'close', 'volume']
+            for col in expected_columns:
+                if col not in stocks_df.columns:
+                    logging.warning(f"⚠️ Missing column: {col}")
+                    stocks_df[col] = 0 if col != 'ticker' and col != 'date' else ''
             
             # Ensure numeric columns
             numeric_columns = ['open', 'high', 'low', 'close', 'volume']
             for col in numeric_columns:
-                if col in stocks_df.columns:
-                    stocks_df[col] = pd.to_numeric(stocks_df[col], errors='coerce')
+                stocks_df[col] = pd.to_numeric(stocks_df[col], errors='coerce').fillna(0)
             
             # Calculate technical indicators
             def calculate_rsi(prices, window=14):
@@ -241,25 +271,55 @@ def process_news_data(**context):
         bucket_name = os.getenv('S3_BUCKET', 'bankanalystportfolio')
         
         try:
-            # Read raw news data
-            news_file_key = f"bronze/news/raw/news_{date_str}.json"
+            # Read multiple JSON files from bronze/news/raw/ structure
+            logging.info("📰 Reading news data from Bronze layer...")
             
-            if not s3_hook.check_for_key(key=news_file_key, bucket_name=bucket_name):
-                logging.warning(f"⚠️ No news data found for {date_str}")
+            # Get list of news files from Bronze layer (individual JSON files)
+            bronze_news_files = []
+            try:
+                # List all JSON files in bronze/news/raw/
+                paginator = s3_hook.get_session().client('s3').get_paginator('list_objects_v2')
+                for page in paginator.paginate(Bucket=bucket_name, Prefix="bronze/news/raw/"):
+                    if 'Contents' in page:
+                        for obj in page['Contents']:
+                            if obj['Key'].endswith('.json'):
+                                bronze_news_files.append(obj['Key'])
+                
+                logging.info(f"📊 Found {len(bronze_news_files)} news files")
+                
+            except Exception as list_error:
+                logging.error(f"❌ Error listing bronze news files: {str(list_error)}")
                 return {'news_processed': 0, 'execution_date': date_str}
             
-            news_content = s3_hook.read_key(key=news_file_key, bucket_name=bucket_name)
-            news_data = json.loads(news_content)
-            
-            articles = news_data.get('articles', [])
-            if len(articles) == 0:
-                logging.warning(f"⚠️ No articles to process")
+            if len(bronze_news_files) == 0:
+                logging.warning(f"⚠️ No news files found")
                 return {'news_processed': 0, 'execution_date': date_str}
             
-            logging.info(f"📄 Processing {len(articles)} news articles")
+            # Read and combine all news JSON files
+            all_articles = []
+            for file_key in bronze_news_files[:50]:  # Limit to 50 most recent files for daily processing
+                try:
+                    file_content = s3_hook.read_key(key=file_key, bucket_name=bucket_name)
+                    article_record = json.loads(file_content)
+                    all_articles.append(article_record)
+                except Exception as file_error:
+                    logging.warning(f"⚠️ Error reading {file_key}: {str(file_error)}")
+                    continue
+            
+            if len(all_articles) == 0:
+                logging.error(f"❌ No valid news data found")
+                return {'news_processed': 0, 'execution_date': date_str}
+            
+            logging.info(f"📄 Processing {len(all_articles)} news articles")
             
             # Convert to DataFrame
-            news_df = pd.DataFrame(articles)
+            news_df = pd.DataFrame(all_articles)
+            
+            # Ensure required columns exist from bronze_news.py schema
+            expected_columns = ['id', 'title', 'combined_text', 'source', 'link', 'date']
+            for col in expected_columns:
+                if col not in news_df.columns:
+                    news_df[col] = ''
             
             # Clean and process functions
             def clean_text(text):
@@ -268,6 +328,78 @@ def process_news_data(**context):
                 text = re.sub(r'\s+', ' ', str(text))
                 text = re.sub(r'[^\w\s\.,;:!?\-\(\)%]', '', text)
                 return text.strip()
+            
+            def calculate_basic_sentiment(text):
+                """Basic sentiment analysis for Vietnamese text"""
+                if pd.isna(text) or not text:
+                    return 0.0
+                
+                # Vietnamese positive/negative keywords
+                positive_words = ['tăng', 'tốt', 'khả quan', 'tích cực', 'thành công', 'phát triển', 'lợi nhuận', 'tăng trưởng']
+                negative_words = ['giảm', 'xấu', 'tiêu cực', 'thất bại', 'thua lỗ', 'suy thoái', 'khó khăn', 'rủi ro']
+                
+                text_lower = text.lower()
+                pos_count = sum(1 for word in positive_words if word in text_lower)
+                neg_count = sum(1 for word in negative_words if word in text_lower)
+                
+                if pos_count + neg_count == 0:
+                    return 0.0
+                
+                return (pos_count - neg_count) / (pos_count + neg_count)
+            
+            # Process news data
+            processed_news = []
+            
+            for idx, row in news_df.iterrows():
+                try:
+                    # Clean title and content
+                    clean_title = clean_text(row.get('title', ''))
+                    clean_content = clean_text(row.get('combined_text', ''))
+                    
+                    if len(clean_title) < 5 and len(clean_content) < 10:
+                        continue  # Skip articles with insufficient content
+                    
+                    # Calculate sentiment
+                    sentiment_score = calculate_basic_sentiment(f"{clean_title} {clean_content}")
+                    sentiment_label = 'positive' if sentiment_score > 0.1 else ('negative' if sentiment_score < -0.1 else 'neutral')
+                    
+                    # Content analysis
+                    content_length = len(clean_content)
+                    word_count = len(clean_content.split()) if clean_content else 0
+                    
+                    # Determine topic category based on content
+                    content_lower = f"{clean_title} {clean_content}".lower()
+                    if any(bank in content_lower for bank in ['ngân hàng', 'bank', 'vcb', 'bidv', 'vietcombank']):
+                        topic_category = 'BANKING'
+                    elif any(word in content_lower for word in ['chứng khoán', 'cổ phiếu', 'stock']):
+                        topic_category = 'STOCKS'
+                    elif any(word in content_lower for word in ['kinh tế', 'gdp', 'lạm phát']):
+                        topic_category = 'ECONOMY'
+                    else:
+                        topic_category = 'FINANCE'
+                    
+                    processed_article = {
+                        'id': str(row.get('id', f'news_{idx}')),
+                        'title': clean_title,
+                        'clean_content': clean_content,
+                        'combined_text': f"{clean_title}. {clean_content}",
+                        'source': str(row.get('source', '')),
+                        'url': str(row.get('link', '')),
+                        'date': str(row.get('date', date_str)),
+                        'content_length': content_length,
+                        'word_count': word_count,
+                        'sentiment_score': round(sentiment_score, 3),
+                        'sentiment_label': sentiment_label,
+                        'topic_category': topic_category,
+                        'language': 'vi',
+                        '_processed_at_utc': pd.Timestamp.utcnow().isoformat() + 'Z'
+                    }
+                    
+                    processed_news.append(processed_article)
+                    
+                except Exception as e:
+                    logging.warning(f"⚠️ Error processing article {idx}: {str(e)}")
+                    continue
             
             def analyze_vietnamese_sentiment(text):
                 if pd.isna(text) or text == "":

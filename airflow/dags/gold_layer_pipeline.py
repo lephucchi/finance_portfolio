@@ -18,6 +18,8 @@ from airflow.utils.dates import days_ago
 import logging
 import os
 import json
+import pandas as pd
+import numpy as np
 
 # Import custom utilities
 import sys
@@ -73,31 +75,39 @@ def create_analytics_tables(**context):
         
         # 1. Create Market Summary from Silver stocks data
         try:
-            stock_file_key = f"silver/stocks/processed/clean_stocks_{date_str}.csv"
+            # Read processed stock data from Silver layer - aligned with actual structure
+            stock_file_key = f"silver/stocks/processed/clean_stocks_{date_str.replace('-', '')}.csv"
             
-            if s3_hook.check_for_key(key=stock_file_key, bucket_name=bucket_name):
+            if not s3_hook.check_for_key(key=stock_file_key, bucket_name=bucket_name):
+                # Try alternative date format
+                alt_stock_key = f"silver/stocks/processed/clean_stocks_{date_str}.csv"
+                if s3_hook.check_for_key(key=alt_stock_key, bucket_name=bucket_name):
+                    stock_file_key = alt_stock_key
+                else:
+                    logging.warning(f"⚠️ No stock data found for market summary in either format")
+                    return {'market_summary_created': False, 'execution_date': date_str}
                 # Read silver stocks data
                 csv_content = s3_hook.read_key(key=stock_file_key, bucket_name=bucket_name)
                 stocks_df = pd.read_csv(pd.StringIO(csv_content))
                 
                 logging.info(f"📈 Processing {len(stocks_df)} stock records for market summary")
                 
-                # Create market summary (from gold_layer_etl.py)
+                # Create market summary aligned with Silver schema
                 market_summary = {
                     'date': date_str,
                     'total_stocks': len(stocks_df),
-                    'avg_price': float(stocks_df['close'].mean()) if len(stocks_df) > 0 else 0,
+                    'avg_close_price': float(stocks_df['close'].mean()) if len(stocks_df) > 0 else 0,
                     'total_volume': int(stocks_df['volume'].sum()) if len(stocks_df) > 0 else 0,
-                    'avg_daily_return': float(stocks_df['daily_return'].mean()) if len(stocks_df) > 0 else 0,
-                    'price_gainers': len(stocks_df[stocks_df['daily_return'] > 0]) if len(stocks_df) > 0 else 0,
-                    'price_losers': len(stocks_df[stocks_df['daily_return'] < 0]) if len(stocks_df) > 0 else 0,
-                    'unchanged': len(stocks_df[stocks_df['daily_return'] == 0]) if len(stocks_df) > 0 else 0,
-                    'market_breadth': (len(stocks_df[stocks_df['daily_return'] > 0]) / len(stocks_df) * 100) if len(stocks_df) > 0 else 0,
+                    'avg_daily_return': float(stocks_df['daily_return'].mean() if 'daily_return' in stocks_df.columns else 0),
+                    'price_gainers': len(stocks_df[stocks_df['daily_return'] > 0]) if 'daily_return' in stocks_df.columns and len(stocks_df) > 0 else 0,
+                    'price_losers': len(stocks_df[stocks_df['daily_return'] < 0]) if 'daily_return' in stocks_df.columns and len(stocks_df) > 0 else 0,
+                    'market_breadth_pct': (len(stocks_df[stocks_df['daily_return'] > 0]) / len(stocks_df) * 100) if 'daily_return' in stocks_df.columns and len(stocks_df) > 0 else 0,
+                    'unique_symbols': int(stocks_df['symbol'].nunique()) if 'symbol' in stocks_df.columns else len(stocks_df),
                     '_created_at_utc': pd.Timestamp.utcnow().isoformat() + 'Z'
                 }
                 
-                # Save market summary
-                market_summary_key = f"gold/analytics/market_summary_{date_str}.json"
+                # Save market summary to Gold analytics
+                market_summary_key = f"gold/analytics/market_summary/market_summary_{date_str.replace('-', '')}.json"
                 s3_hook.load_string(
                     string_data=json.dumps(market_summary, ensure_ascii=False, indent=2),
                     key=market_summary_key,
@@ -114,35 +124,69 @@ def create_analytics_tables(**context):
         except Exception as e:
             logging.error(f"❌ Market summary creation failed: {str(e)}")
         
-        # 2. Create Stock Features for ML (from gold_layer_etl.py)
+        # 2. Create Stock Features for ML aligned with Silver schema
         try:
             if results['market_summary_created']:
-                # Create ML-ready features
-                stocks_df['price_change_pct'] = stocks_df['daily_return']
-                stocks_df['volume_normalized'] = (stocks_df['volume'] - stocks_df['volume'].mean()) / stocks_df['volume'].std()
-                stocks_df['price_momentum'] = stocks_df['close'] - stocks_df['open']
-                stocks_df['volatility_score'] = abs(stocks_df['daily_return'])
-                
-                # Banking tier classification
-                big4_banks = ['VCB', 'BID', 'CTG', 'AGR']
-                tier1_banks = ['VPB', 'TCB', 'MBB', 'STB', 'HDB', 'ACB']
-                
-                def classify_bank_tier(ticker):
-                    if ticker in big4_banks:
-                        return 'BIG_4'
-                    elif ticker in tier1_banks:
-                        return 'TIER_1'
-                    else:
-                        return 'TIER_2'
-                
-                stocks_df['bank_tier'] = stocks_df['ticker'].apply(classify_bank_tier)
-                
-                # Save ML features
-                ml_features_csv = stocks_df[['ticker', 'date', 'close', 'volume', 'daily_return', 
-                                           'price_change_pct', 'volume_normalized', 'price_momentum',
-                                           'volatility_score', 'bank_tier']].to_csv(index=False)
-                
-                ml_features_key = f"gold/serving/ml_features_{date_str}.csv"
+                # Use existing stocks_df if market summary was created
+                if 'stocks_df' in locals() and not stocks_df.empty:
+                    # Create ML-ready features using actual Silver schema
+                    ml_features = stocks_df.copy()
+                    
+                    # Ensure we have the required columns from Silver
+                    if 'symbol' in ml_features.columns:
+                        ml_features['ticker'] = ml_features['symbol']  # Standardize naming
+                    
+                    # Price-based features using actual Silver columns
+                    if all(col in ml_features.columns for col in ['close', 'open']):
+                        ml_features['price_change_pct'] = (ml_features['close'] - ml_features['open']) / ml_features['open']
+                    
+                    if all(col in ml_features.columns for col in ['high', 'low']):
+                        ml_features['daily_range_pct'] = (ml_features['high'] - ml_features['low']) / ml_features['low']
+                    
+                    # Volume features
+                    if 'volume' in ml_features.columns:
+                        ml_features['volume_log'] = np.log1p(ml_features['volume'])
+                        ml_features['volume_scaled'] = (ml_features['volume'] - ml_features['volume'].mean()) / ml_features['volume'].std()
+                    
+                    # Technical indicators from Silver (if available)
+                    tech_columns = ['MA_5', 'MA_20', 'RSI', 'MACD', 'BB_position']
+                    for col in tech_columns:
+                        if col not in ml_features.columns:
+                            ml_features[col] = 0  # Default values if not available
+                    
+                    # Banking sector classification
+                    big4_banks = ['VCB', 'BID', 'CTG', 'AGR']
+                    tier1_banks = ['VPB', 'TCB', 'MBB', 'STB', 'HDB', 'ACB']
+                    
+                    def classify_bank_tier(symbol):
+                        symbol = str(symbol).upper()
+                        if symbol in big4_banks:
+                            return 'BIG_4'
+                        elif symbol in tier1_banks:
+                            return 'TIER_1'
+                        else:
+                            return 'TIER_2'
+                    
+                    symbol_col = 'symbol' if 'symbol' in ml_features.columns else 'ticker'
+                    ml_features['bank_tier'] = ml_features[symbol_col].apply(classify_bank_tier)
+                    
+                    # Select final ML feature columns
+                    feature_columns = ['symbol', 'date', 'close', 'volume', 'bank_tier']
+                    if 'daily_return' in ml_features.columns:
+                        feature_columns.append('daily_return')
+                    if 'price_change_pct' in ml_features.columns:
+                        feature_columns.append('price_change_pct')
+                    if 'volume_log' in ml_features.columns:
+                        feature_columns.append('volume_log')
+                    
+                    # Add technical indicators
+                    feature_columns.extend([col for col in tech_columns if col in ml_features.columns])
+                    
+                    final_ml_features = ml_features[feature_columns].copy()
+                    
+                    # Save ML features to Gold serving
+                    ml_features_csv = final_ml_features.to_csv(index=False)
+                    ml_features_key = f"gold/serving/ml_features/ml_features_{date_str.replace('-', '')}.csv"
                 s3_hook.load_string(
                     string_data=ml_features_csv,
                     key=ml_features_key,
@@ -156,9 +200,15 @@ def create_analytics_tables(**context):
         except Exception as e:
             logging.error(f"❌ Stock features creation failed: {str(e)}")
         
-        # 3. Create News Sentiment Analytics (from gold_layer_etl.py)
+        # 3. Create News Sentiment Analytics aligned with Silver schema
         try:
-            news_file_key = f"silver/news/processed/clean_news_{date_str}.csv"
+            news_file_key = f"silver/news/processed/clean_news_{date_str.replace('-', '')}.csv"
+            
+            # Try alternative date format
+            if not s3_hook.check_for_key(key=news_file_key, bucket_name=bucket_name):
+                alt_news_key = f"silver/news/processed/clean_news_{date_str}.csv"
+                if s3_hook.check_for_key(key=alt_news_key, bucket_name=bucket_name):
+                    news_file_key = alt_news_key
             
             if s3_hook.check_for_key(key=news_file_key, bucket_name=bucket_name):
                 # Read silver news data
@@ -167,20 +217,52 @@ def create_analytics_tables(**context):
                 
                 logging.info(f"📰 Processing {len(news_df)} news articles for sentiment analytics")
                 
-                # Create sentiment analytics
+                # Create sentiment analytics using actual Silver schema
                 sentiment_analytics = {
                     'date': date_str,
                     'total_articles': len(news_df),
-                    'sentiment_distribution': news_df['sentiment_basic'].value_counts().to_dict(),
-                    'topic_distribution': news_df['topic_category'].value_counts().to_dict(),
-                    'avg_content_length': float(news_df['content_length'].mean()) if len(news_df) > 0 else 0,
-                    'banking_articles': len(news_df[news_df['topic_category'] == 'BANKING']) if len(news_df) > 0 else 0,
-                    'positive_sentiment_ratio': (len(news_df[news_df['sentiment_basic'] == 'POSITIVE']) / len(news_df) * 100) if len(news_df) > 0 else 0,
+                    'sentiment_distribution': {},
+                    'topic_distribution': {},
+                    'avg_content_length': 0,
+                    'banking_articles': 0,
+                    'positive_sentiment_ratio': 0,
                     '_created_at_utc': pd.Timestamp.utcnow().isoformat() + 'Z'
                 }
                 
+                # Handle sentiment columns based on actual Silver output
+                if 'sentiment_basic' in news_df.columns:
+                    sentiment_analytics['sentiment_distribution'] = news_df['sentiment_basic'].value_counts().to_dict()
+                    positive_count = len(news_df[news_df['sentiment_basic'] == 'POSITIVE'])
+                    sentiment_analytics['positive_sentiment_ratio'] = (positive_count / len(news_df) * 100) if len(news_df) > 0 else 0
+                elif 'sentiment_score' in news_df.columns:
+                    # Create basic sentiment from scores
+                    news_df['sentiment_basic'] = news_df['sentiment_score'].apply(
+                        lambda x: 'POSITIVE' if x > 0.1 else ('NEGATIVE' if x < -0.1 else 'NEUTRAL')
+                    )
+                    sentiment_analytics['sentiment_distribution'] = news_df['sentiment_basic'].value_counts().to_dict()
+                    positive_count = len(news_df[news_df['sentiment_basic'] == 'POSITIVE'])
+                    sentiment_analytics['positive_sentiment_ratio'] = (positive_count / len(news_df) * 100) if len(news_df) > 0 else 0
+                
+                # Handle topic/category columns
+                if 'topic_category' in news_df.columns:
+                    sentiment_analytics['topic_distribution'] = news_df['topic_category'].value_counts().to_dict()
+                    sentiment_analytics['banking_articles'] = len(news_df[news_df['topic_category'] == 'BANKING'])
+                elif 'category' in news_df.columns:
+                    sentiment_analytics['topic_distribution'] = news_df['category'].value_counts().to_dict()
+                    sentiment_analytics['banking_articles'] = len(news_df[news_df['category'].str.contains('BANK', case=False, na=False)])
+                
+                # Handle content length
+                if 'content_length' in news_df.columns:
+                    sentiment_analytics['avg_content_length'] = float(news_df['content_length'].mean())
+                elif 'combined_text' in news_df.columns:
+                    news_df['content_length'] = news_df['combined_text'].str.len()
+                    sentiment_analytics['avg_content_length'] = float(news_df['content_length'].mean())
+                elif 'title' in news_df.columns:
+                    news_df['content_length'] = news_df['title'].str.len()
+                    sentiment_analytics['avg_content_length'] = float(news_df['content_length'].mean())
+                
                 # Save sentiment analytics
-                sentiment_key = f"gold/analytics/news_sentiment_{date_str}.json"
+                sentiment_key = f"gold/analytics/sentiment_analysis/news_sentiment_{date_str.replace('-', '')}.json"
                 s3_hook.load_string(
                     string_data=json.dumps(sentiment_analytics, ensure_ascii=False, indent=2),
                     key=sentiment_key,
@@ -242,12 +324,17 @@ def create_ml_features(**context):
         bucket_name = os.getenv('S3_BUCKET', 'bankanalystportfolio')
         
         try:
-            # Read processed stock data from Silver layer
-            stock_file_key = f"silver/stocks/processed/clean_stocks_{date_str}.csv"
+            # Read processed stock data from Silver layer - aligned with actual structure
+            stock_file_key = f"silver/stocks/processed/clean_stocks_{date_str.replace('-', '')}.csv"
             
             if not s3_hook.check_for_key(key=stock_file_key, bucket_name=bucket_name):
-                logging.warning(f"⚠️ No stock data found for ML features")
-                return {'ml_features_records': 0, 'execution_date': date_str}
+                # Try alternative date format
+                alt_stock_key = f"silver/stocks/processed/clean_stocks_{date_str}.csv"
+                if s3_hook.check_for_key(key=alt_stock_key, bucket_name=bucket_name):
+                    stock_file_key = alt_stock_key
+                else:
+                    logging.warning(f"⚠️ No stock data found for ML features")
+                    return {'ml_features_records': 0, 'execution_date': date_str}
             
             # Read and process data
             csv_content = s3_hook.read_key(key=stock_file_key, bucket_name=bucket_name)
@@ -255,28 +342,50 @@ def create_ml_features(**context):
             
             logging.info(f"🤖 Processing {len(df)} records for ML features")
             
-            # Create ML features (from gold_layer_etl.py)
+            # Create ML features aligned with Silver schema
             ml_df = df.copy()
             
-            # Price-based features
-            ml_df['price_to_open_ratio'] = ml_df['close'] / ml_df['open']
-            ml_df['high_low_spread'] = (ml_df['high'] - ml_df['low']) / ml_df['low']
-            ml_df['price_position'] = (ml_df['close'] - ml_df['low']) / (ml_df['high'] - ml_df['low'])
+            # Standardize column names
+            if 'symbol' in ml_df.columns and 'ticker' not in ml_df.columns:
+                ml_df['ticker'] = ml_df['symbol']
+            
+            # Price-based features using available columns
+            if all(col in ml_df.columns for col in ['close', 'open']):
+                ml_df['price_to_open_ratio'] = ml_df['close'] / ml_df['open']
+            
+            if all(col in ml_df.columns for col in ['high', 'low']):
+                ml_df['high_low_spread'] = (ml_df['high'] - ml_df['low']) / ml_df['low']
+                ml_df['price_position'] = (ml_df['close'] - ml_df['low']) / (ml_df['high'] - ml_df['low'])
             
             # Volume features
-            ml_df['volume_log'] = np.log1p(ml_df['volume'])  # Log transform to handle large values
-            ml_df['volume_scaled'] = (ml_df['volume'] - ml_df['volume'].mean()) / ml_df['volume'].std()
+            if 'volume' in ml_df.columns:
+                ml_df['volume_log'] = np.log1p(ml_df['volume'])  # Log transform
+                vol_mean = ml_df['volume'].mean()
+                vol_std = ml_df['volume'].std()
+                if vol_std > 0:
+                    ml_df['volume_scaled'] = (ml_df['volume'] - vol_mean) / vol_std
+                else:
+                    ml_df['volume_scaled'] = 0
             
             # Return-based features
-            ml_df['return_squared'] = ml_df['daily_return'] ** 2  # For volatility modeling
-            ml_df['return_positive'] = (ml_df['daily_return'] > 0).astype(int)
-            ml_df['return_abs'] = abs(ml_df['daily_return'])
+            if 'daily_return' in ml_df.columns:
+                ml_df['return_squared'] = ml_df['daily_return'] ** 2
+                ml_df['return_positive'] = (ml_df['daily_return'] > 0).astype(int)
+                ml_df['return_abs'] = abs(ml_df['daily_return'])
+            else:
+                # Calculate daily return if not present
+                if all(col in ml_df.columns for col in ['close', 'open']):
+                    ml_df['daily_return'] = (ml_df['close'] - ml_df['open']) / ml_df['open']
+                    ml_df['return_squared'] = ml_df['daily_return'] ** 2
+                    ml_df['return_positive'] = (ml_df['daily_return'] > 0).astype(int)
+                    ml_df['return_abs'] = abs(ml_df['daily_return'])
             
             # Banking sector encoding
             big4_banks = ['VCB', 'BID', 'CTG', 'AGR']
             tier1_banks = ['VPB', 'TCB', 'MBB', 'STB', 'HDB', 'ACB', 'TPB', 'VIB']
             
             def encode_bank_tier(ticker):
+                ticker = str(ticker).upper()
                 if ticker in big4_banks:
                     return 1.0  # Highest tier
                 elif ticker in tier1_banks:
@@ -284,40 +393,59 @@ def create_ml_features(**context):
                 else:
                     return 0.3  # Lower tier
             
-            ml_df['bank_tier_score'] = ml_df['ticker'].apply(encode_bank_tier)
+            ticker_col = 'ticker' if 'ticker' in ml_df.columns else 'symbol'
+            ml_df['bank_tier_score'] = ml_df[ticker_col].apply(encode_bank_tier)
             
-            # Technical signal encoding
-            ml_df['is_bullish'] = (ml_df['trend_signal'] == 'BULLISH').astype(int)
-            ml_df['is_bearish'] = (ml_df['trend_signal'] == 'BEARISH').astype(int)
-            ml_df['rsi_overbought'] = (ml_df['rsi_signal'] == 'OVERBOUGHT').astype(int)
-            ml_df['rsi_oversold'] = (ml_df['rsi_signal'] == 'OVERSOLD').astype(int)
+            # Technical signal encoding (use defaults if not available)
+            if 'trend_signal' in ml_df.columns:
+                ml_df['is_bullish'] = (ml_df['trend_signal'] == 'BULLISH').astype(int)
+                ml_df['is_bearish'] = (ml_df['trend_signal'] == 'BEARISH').astype(int)
+            else:
+                ml_df['is_bullish'] = 0
+                ml_df['is_bearish'] = 0
             
-            # Target variables for supervised learning (simplified for single day)
-            ml_df['target_direction'] = ml_df['daily_return'].apply(
-                lambda x: 'UP' if x > 0.02 else ('DOWN' if x < -0.02 else 'FLAT')
-            )
-            ml_df['target_volatility'] = ml_df['return_abs']
+            if 'rsi_signal' in ml_df.columns:
+                ml_df['rsi_overbought'] = (ml_df['rsi_signal'] == 'OVERBOUGHT').astype(int)
+                ml_df['rsi_oversold'] = (ml_df['rsi_signal'] == 'OVERSOLD').astype(int)
+            else:
+                ml_df['rsi_overbought'] = 0
+                ml_df['rsi_oversold'] = 0
             
-            # Select ML-ready features
-            feature_columns = [
-                'ticker', 'date', 'close', 'volume', 'daily_return',
+            # Target variables for supervised learning
+            if 'daily_return' in ml_df.columns:
+                ml_df['target_direction'] = ml_df['daily_return'].apply(
+                    lambda x: 'UP' if x > 0.02 else ('DOWN' if x < -0.02 else 'FLAT')
+                )
+                ml_df['target_volatility'] = ml_df['return_abs'] if 'return_abs' in ml_df.columns else abs(ml_df['daily_return'])
+            else:
+                ml_df['target_direction'] = 'FLAT'
+                ml_df['target_volatility'] = 0
+            
+            # Select ML-ready features (only include columns that exist)
+            base_columns = ['ticker', 'date', 'close', 'volume', 'daily_return']
+            feature_columns = [col for col in base_columns if col in ml_df.columns]
+            
+            additional_features = [
                 'price_to_open_ratio', 'high_low_spread', 'price_position',
                 'volume_log', 'volume_scaled', 'return_squared', 'return_positive',
                 'return_abs', 'bank_tier_score', 'is_bullish', 'is_bearish',
                 'rsi_overbought', 'rsi_oversold', 'target_direction', 'target_volatility'
             ]
             
-            # Filter columns that exist
-            available_columns = [col for col in feature_columns if col in ml_df.columns]
-            ml_features_df = ml_df[available_columns].copy()
+            for col in additional_features:
+                if col in ml_df.columns:
+                    feature_columns.append(col)
+            
+            # Filter columns that exist and create final ML features
+            ml_features_df = ml_df[feature_columns].copy()
             
             # Add metadata
-            ml_features_df['_ml_features_version'] = '1.0'
+            ml_features_df['_ml_features_version'] = '2.0'
             ml_features_df['_created_at_utc'] = pd.Timestamp.utcnow().isoformat() + 'Z'
             
             # Save ML features
             ml_csv_content = ml_features_df.to_csv(index=False)
-            ml_features_key = f"gold/serving/ml_features_{date_str}.csv"
+            ml_features_key = f"gold/serving/ml_features/ml_features_{date_str.replace('-', '')}.csv"
             
             s3_hook.load_string(
                 string_data=ml_csv_content,
@@ -329,17 +457,17 @@ def create_ml_features(**context):
             # Create feature statistics for monitoring
             feature_stats = {
                 'total_samples': len(ml_features_df),
-                'feature_count': len(available_columns),
-                'target_distribution': ml_features_df['target_direction'].value_counts().to_dict(),
-                'avg_return': float(ml_features_df['daily_return'].mean()),
-                'return_volatility': float(ml_features_df['daily_return'].std()),
-                'bank_tier_distribution': ml_features_df['bank_tier_score'].value_counts().to_dict(),
+                'feature_count': len(feature_columns),
+                'target_distribution': ml_features_df['target_direction'].value_counts().to_dict() if 'target_direction' in ml_features_df.columns else {},
+                'avg_return': float(ml_features_df['daily_return'].mean()) if 'daily_return' in ml_features_df.columns else 0,
+                'return_volatility': float(ml_features_df['daily_return'].std()) if 'daily_return' in ml_features_df.columns else 0,
+                'bank_tier_distribution': ml_features_df['bank_tier_score'].value_counts().to_dict() if 'bank_tier_score' in ml_features_df.columns else {},
                 'processing_date': date_str,
                 '_created_at_utc': pd.Timestamp.utcnow().isoformat() + 'Z'
             }
             
             # Save feature statistics
-            stats_key = f"gold/metadata/feature_stats_{date_str}.json"
+            stats_key = f"gold/metadata/feature_stats/feature_stats_{date_str.replace('-', '')}.json"
             s3_hook.load_string(
                 string_data=json.dumps(feature_stats, ensure_ascii=False, indent=2),
                 key=stats_key,
@@ -349,9 +477,9 @@ def create_ml_features(**context):
             
             result = {
                 'ml_features_records': len(ml_features_df),
-                'feature_columns': len(available_columns),
-                'target_up_count': len(ml_features_df[ml_features_df['target_direction'] == 'UP']),
-                'target_down_count': len(ml_features_df[ml_features_df['target_direction'] == 'DOWN']),
+                'feature_columns': len(feature_columns),
+                'target_up_count': len(ml_features_df[ml_features_df['target_direction'] == 'UP']) if 'target_direction' in ml_features_df.columns else 0,
+                'target_down_count': len(ml_features_df[ml_features_df['target_direction'] == 'DOWN']) if 'target_direction' in ml_features_df.columns else 0,
                 'execution_date': date_str
             }
             
@@ -383,13 +511,27 @@ def create_integrated_views(**context):
         bucket_name = os.getenv('S3_BUCKET', 'bankanalystportfolio')
         
         try:
-            # Read stock data
-            stock_file_key = f"silver/stocks/processed/clean_stocks_{date_str}.csv"
+            # Read stock data - aligned with actual Silver structure
+            stock_file_key = f"silver/stocks/processed/clean_stocks_{date_str.replace('-', '')}.csv"
             has_stocks = s3_hook.check_for_key(key=stock_file_key, bucket_name=bucket_name)
             
-            # Read news data
-            news_file_key = f"silver/news/processed/clean_news_{date_str}.csv"
+            if not has_stocks:
+                # Try alternative date format
+                alt_stock_key = f"silver/stocks/processed/clean_stocks_{date_str}.csv"
+                has_stocks = s3_hook.check_for_key(key=alt_stock_key, bucket_name=bucket_name)
+                if has_stocks:
+                    stock_file_key = alt_stock_key
+            
+            # Read news data - aligned with actual Silver structure
+            news_file_key = f"silver/news/processed/clean_news_{date_str.replace('-', '')}.csv"
             has_news = s3_hook.check_for_key(key=news_file_key, bucket_name=bucket_name)
+            
+            if not has_news:
+                # Try alternative date format
+                alt_news_key = f"silver/news/processed/clean_news_{date_str}.csv"
+                has_news = s3_hook.check_for_key(key=alt_news_key, bucket_name=bucket_name)
+                if has_news:
+                    news_file_key = alt_news_key
             
             if not has_stocks:
                 logging.warning(f"⚠️ No stock data found for integrated view")
@@ -412,15 +554,39 @@ def create_integrated_views(**context):
                     
                     logging.info(f"📰 Loaded {len(news_df)} news articles")
                     
-                    # Aggregate news sentiment by date
+                    # Aggregate news sentiment by date - aligned with Silver schema
                     daily_sentiment = {
                         'total_articles': len(news_df),
-                        'positive_articles': len(news_df[news_df['sentiment_basic'] == 'POSITIVE']),
-                        'negative_articles': len(news_df[news_df['sentiment_basic'] == 'NEGATIVE']),
-                        'neutral_articles': len(news_df[news_df['sentiment_basic'] == 'NEUTRAL']),
-                        'banking_articles': len(news_df[news_df['topic_category'] == 'BANKING']),
-                        'avg_content_length': float(news_df['content_length'].mean()) if len(news_df) > 0 else 0
+                        'positive_articles': 0,
+                        'negative_articles': 0,
+                        'neutral_articles': 0,
+                        'banking_articles': 0,
+                        'avg_content_length': 0
                     }
+                    
+                    # Handle sentiment columns based on actual Silver schema
+                    if 'sentiment_basic' in news_df.columns:
+                        daily_sentiment['positive_articles'] = len(news_df[news_df['sentiment_basic'] == 'POSITIVE'])
+                        daily_sentiment['negative_articles'] = len(news_df[news_df['sentiment_basic'] == 'NEGATIVE'])
+                        daily_sentiment['neutral_articles'] = len(news_df[news_df['sentiment_basic'] == 'NEUTRAL'])
+                    elif 'sentiment_score' in news_df.columns:
+                        daily_sentiment['positive_articles'] = len(news_df[news_df['sentiment_score'] > 0.1])
+                        daily_sentiment['negative_articles'] = len(news_df[news_df['sentiment_score'] < -0.1])
+                        daily_sentiment['neutral_articles'] = len(news_df[(news_df['sentiment_score'] >= -0.1) & (news_df['sentiment_score'] <= 0.1)])
+                    
+                    # Handle topic/category columns
+                    if 'topic_category' in news_df.columns:
+                        daily_sentiment['banking_articles'] = len(news_df[news_df['topic_category'] == 'BANKING'])
+                    elif 'category' in news_df.columns:
+                        daily_sentiment['banking_articles'] = len(news_df[news_df['category'].str.contains('BANK', case=False, na=False)])
+                    
+                    # Handle content length
+                    if 'content_length' in news_df.columns:
+                        daily_sentiment['avg_content_length'] = float(news_df['content_length'].mean())
+                    elif 'combined_text' in news_df.columns:
+                        daily_sentiment['avg_content_length'] = float(news_df['combined_text'].str.len().mean())
+                    elif 'title' in news_df.columns:
+                        daily_sentiment['avg_content_length'] = float(news_df['title'].str.len().mean())
                     
                     # Calculate sentiment score
                     if daily_sentiment['total_articles'] > 0:
@@ -475,9 +641,9 @@ def create_integrated_views(**context):
             integrated_df['_created_at_utc'] = pd.Timestamp.utcnow().isoformat() + 'Z'
             integrated_df['_has_news_data'] = has_news
             
-            # Save integrated view
+            # Save integrated view to Gold serving layer
             integrated_csv_content = integrated_df.to_csv(index=False)
-            integrated_key = f"gold/serving/integrated_view_{date_str}.csv"
+            integrated_key = f"gold/serving/integrated_view/integrated_view_{date_str.replace('-', '')}.csv"
             
             s3_hook.load_string(
                 string_data=integrated_csv_content,
@@ -490,19 +656,19 @@ def create_integrated_views(**context):
             integrated_summary = {
                 'processing_date': date_str,
                 'total_records': len(integrated_df),
-                'unique_stocks': integrated_df['ticker'].nunique(),
+                'unique_stocks': integrated_df['ticker'].nunique() if 'ticker' in integrated_df.columns else integrated_df['symbol'].nunique(),
                 'has_news_data': has_news,
                 'market_summary': {
-                    'avg_return': float(integrated_df['daily_return'].mean()),
-                    'total_volume': int(integrated_df['volume'].sum()),
-                    'avg_sentiment_score': float(integrated_df['news_sentiment_score'].mean())
+                    'avg_return': float(integrated_df['daily_return'].mean()) if 'daily_return' in integrated_df.columns else 0,
+                    'total_volume': int(integrated_df['volume'].sum()) if 'volume' in integrated_df.columns else 0,
+                    'avg_sentiment_score': float(integrated_df['news_sentiment_score'].mean()) if 'news_sentiment_score' in integrated_df.columns else 0
                 },
-                'sector_distribution': integrated_df['bank_sector'].value_counts().to_dict(),
+                'sector_distribution': integrated_df['bank_sector'].value_counts().to_dict() if 'bank_sector' in integrated_df.columns else {},
                 '_created_at_utc': pd.Timestamp.utcnow().isoformat() + 'Z'
             }
             
-            # Save integrated summary
-            summary_key = f"gold/metadata/integrated_summary_{date_str}.json"
+            # Save integrated summary to Gold metadata
+            summary_key = f"gold/metadata/integrated_summary/integrated_summary_{date_str.replace('-', '')}.json"
             s3_hook.load_string(
                 string_data=json.dumps(integrated_summary, ensure_ascii=False, indent=2),
                 key=summary_key,
@@ -513,7 +679,7 @@ def create_integrated_views(**context):
             result = {
                 'integrated_records': len(integrated_df),
                 'has_news_data': has_news,
-                'unique_stocks': integrated_df['ticker'].nunique(),
+                'unique_stocks': integrated_df['ticker'].nunique() if 'ticker' in integrated_df.columns else integrated_df['symbol'].nunique(),
                 'execution_date': date_str
             }
             
