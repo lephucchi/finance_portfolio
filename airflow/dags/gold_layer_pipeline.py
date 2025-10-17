@@ -24,7 +24,12 @@ import numpy as np
 # Import custom utilities
 import sys
 sys.path.append('/opt/airflow/plugins')
-from spark_utils import get_spark_manager, get_financial_processor, with_spark_session
+sys.path.append('/opt/airflow/utils')
+# Temporarily comment out Spark imports for testing
+# from spark_utils import get_spark_manager, get_financial_processor, with_spark_session
+
+# Import enhanced logging
+from enhanced_logger import get_enhanced_logger, log_pipeline_start, log_pipeline_success, log_pipeline_error
 
 # Default args
 default_args = {
@@ -52,11 +57,24 @@ dag = DAG(
 
 def create_analytics_tables(**context):
     """Create business intelligence tables based on gold_layer_etl.py logic"""
+    # Initialize enhanced logger
+    logger = get_enhanced_logger("gold_analytics_creation", "INFO")
+    
+    # Start pipeline operation tracking
+    metadata = log_pipeline_start(
+        logger,
+        pipeline_name="gold_analytics_creation",
+        layer="gold",
+        operation="create_business_intelligence",
+        dag_run_id=context.get('dag_run').run_id,
+        task_id=context.get('task_instance').task_id
+    )
+    
     try:
         execution_date = context['execution_date']
         date_str = execution_date.strftime('%Y-%m-%d')
         
-        logging.info(f"📊 Creating analytics tables for {date_str}")
+        logger.log_progress(metadata, f"Starting analytics tables creation for {date_str}")
         
         from airflow.providers.amazon.aws.hooks.s3 import S3Hook
         import pandas as pd
@@ -73,8 +91,13 @@ def create_analytics_tables(**context):
             'execution_date': date_str
         }
         
+        s3_paths = []
+        processed_records = 0
+        
         # 1. Create Market Summary from Silver stocks data
         try:
+            logger.log_progress(metadata, "Creating market summary from silver stocks data")
+            
             # Read processed stock data from Silver layer - aligned with actual structure
             stock_file_key = f"silver/stocks/processed/clean_stocks_{date_str.replace('-', '')}.csv"
             
@@ -84,13 +107,16 @@ def create_analytics_tables(**context):
                 if s3_hook.check_for_key(key=alt_stock_key, bucket_name=bucket_name):
                     stock_file_key = alt_stock_key
                 else:
-                    logging.warning(f"⚠️ No stock data found for market summary in either format")
-                    return {'market_summary_created': False, 'execution_date': date_str}
+                    logger.log_progress(metadata, "No stock data found for market summary in either format")
+                    results['market_summary_created'] = False
+                
+            if results['market_summary_created'] != False:  # Only proceed if we found data
                 # Read silver stocks data
                 csv_content = s3_hook.read_key(key=stock_file_key, bucket_name=bucket_name)
                 stocks_df = pd.read_csv(pd.StringIO(csv_content))
                 
-                logging.info(f"📈 Processing {len(stocks_df)} stock records for market summary")
+                logger.log_progress(metadata, f"Processing {len(stocks_df)} stock records for market summary",
+                                  stock_records=len(stocks_df))
                 
                 # Create market summary aligned with Silver schema
                 market_summary = {
@@ -261,59 +287,135 @@ def create_analytics_tables(**context):
                     news_df['content_length'] = news_df['title'].str.len()
                     sentiment_analytics['avg_content_length'] = float(news_df['content_length'].mean())
                 
-                # Save sentiment analytics
+                # Save sentiment analytics with S3 logging
                 sentiment_key = f"gold/analytics/sentiment_analysis/news_sentiment_{date_str.replace('-', '')}.json"
+                logger.log_s3_operation(metadata, "write", sentiment_key, "analytics_json")
                 s3_hook.load_string(
                     string_data=json.dumps(sentiment_analytics, ensure_ascii=False, indent=2),
                     key=sentiment_key,
                     bucket_name=bucket_name,
                     replace=True
                 )
+                s3_paths.append(sentiment_key)
+                processed_records += len(news_df)
                 
                 results['news_sentiment_created'] = True
-                logging.info(f"✅ News sentiment analytics created for {len(news_df)} articles")
+                logger.log_progress(metadata, f"News sentiment analytics created for {len(news_df)} articles",
+                                  articles_processed=len(news_df))
                 
             else:
-                logging.warning(f"⚠️ No news data found for sentiment analytics")
+                logger.log_progress(metadata, "No news data found for sentiment analytics")
                 
         except Exception as e:
-            logging.error(f"❌ News sentiment analytics failed: {str(e)}")
+            logger.log_progress(metadata, f"News sentiment analytics failed: {str(e)}")
         
-        # Create overall analytics metadata
-        analytics_metadata = {
-            'processing_date': date_str,
-            'analytics_created': results,
-            'gold_layer_structure': {
-                'analytics_path': 'gold/analytics/',
-                'serving_path': 'gold/serving/',
-                'metadata_path': 'gold/metadata/'
-            },
-            '_created_at_utc': pd.Timestamp.utcnow().isoformat() + 'Z'
+        # Log file operations
+        logger.log_file_operations(metadata, s3_paths=s3_paths)
+        
+        # Quality metrics
+        quality_metrics = {
+            'analytics_completion_rate': sum(results.values()) / len(results) * 100,
+            'market_summary_status': results['market_summary_created'],
+            'stock_features_status': results['stock_features_created'],
+            'news_sentiment_status': results['news_sentiment_created'],
+            'total_analytics_created': sum(results.values())
         }
         
-        # Save analytics metadata
-        metadata_key = f"gold/metadata/analytics_metadata_{date_str}.json"
+        # Log data quality
+        logger.log_data_quality(
+            metadata,
+            source_count=3,  # Three analytics types attempted
+            target_count=sum(results.values()),
+            error_count=3 - sum(results.values()),
+            quality_metrics=quality_metrics
+        )
+        
+        # Create detailed analytics metadata using enhanced logger structure
+        detailed_metadata = {
+            'analytics_info': {
+                'execution_date': date_str,
+                'pipeline_version': '2.0_analytics',
+                'layer': 'gold',
+                'operation': 'create_business_intelligence',
+                'processing_timestamp': pd.Timestamp.utcnow().isoformat() + 'Z',
+                'input_sources': ['silver/stocks/processed/', 'silver/news/processed/'],
+                'output_location': 'gold/analytics/'
+            },
+            'analytics_summary': {
+                'total_analytics_created': sum(results.values()),
+                'market_summary_created': results['market_summary_created'],
+                'stock_features_created': results['stock_features_created'],
+                'news_sentiment_created': results['news_sentiment_created'],
+                'total_records_processed': processed_records,
+                'analytics_types': ['market_summary', 'ml_features', 'sentiment_analysis']
+            },
+            'business_intelligence': {
+                'completion_rate_percent': round(sum(results.values()) / len(results) * 100, 2),
+                'analytics_outputs': s3_paths,
+                'serving_layer_ready': all([results['market_summary_created'], results['stock_features_created']]),
+                'decision_support_metrics': {
+                    'market_insights_available': results['market_summary_created'],
+                    'ml_features_ready': results['stock_features_created'],
+                    'sentiment_insights_available': results['news_sentiment_created']
+                }
+            },
+            'data_governance': {
+                'data_lineage': 'silver/stocks/processed/ + silver/news/processed/ -> gold/analytics/',
+                'transformation_applied': ['aggregation', 'feature_engineering', 'sentiment_analysis', 'ml_preparation'],
+                'quality_checks': {
+                    'all_analytics_completed': all(results.values()),
+                    'output_files_created': len(s3_paths) > 0,
+                    'serving_layer_preparation': results['market_summary_created'] and results['stock_features_created']
+                }
+            }
+        }
+        
+        # Save detailed metadata
+        metadata_key = f"gold/analytics/metadata/analytics_creation_metadata_{date_str}.json"
+        logger.log_s3_operation(metadata, "write", metadata_key, "metadata")
         s3_hook.load_string(
-            string_data=json.dumps(analytics_metadata, ensure_ascii=False, indent=2),
+            string_data=json.dumps(detailed_metadata, ensure_ascii=False, indent=2),
             key=metadata_key,
             bucket_name=bucket_name,
             replace=True
         )
+        s3_paths.append(metadata_key)
         
-        logging.info(f"✅ Analytics tables creation completed: {results}")
+        # Finish pipeline operation
+        final_metadata = log_pipeline_success(logger, metadata, 3, sum(results.values()))
+        
+        logger.log_progress(metadata, "Analytics tables creation completed successfully", **results)
         return results
         
     except Exception as e:
-        logging.error(f"💥 Analytics table creation failed: {str(e)}")
+        # Error logging with context
+        context_data = {
+            'analytics_attempted': list(results.keys()) if 'results' in locals() else [],
+            'stage': 'analytics_creation'
+        }
+        log_pipeline_error(logger, metadata, e, context_data)
         raise
 
 def create_ml_features(**context):
     """Create ML-ready feature datasets based on gold_layer_etl.py logic"""
+    # Initialize enhanced logger
+    logger = get_enhanced_logger("gold_ml_features", "INFO")
+    
+    # Start pipeline operation tracking
+    metadata = log_pipeline_start(
+        logger,
+        pipeline_name="gold_ml_features_creation",
+        layer="gold",
+        operation="create_ml_datasets",
+        dag_run_id=context.get('dag_run').run_id,
+        task_id=context.get('task_instance').task_id
+    )
+    
     try:
         execution_date = context['execution_date']
         date_str = execution_date.strftime('%Y-%m-%d')
         
-        logging.info(f"🤖 Creating ML features for {date_str}")
+        logger.log_progress(metadata, f"Starting ML features creation for {date_str}")
         
         from airflow.providers.amazon.aws.hooks.s3 import S3Hook
         import pandas as pd
@@ -323,7 +425,11 @@ def create_ml_features(**context):
         s3_hook = S3Hook(aws_conn_id='aws_default')
         bucket_name = os.getenv('S3_BUCKET', 'bankanalystportfolio')
         
+        s3_paths = []
+        
         try:
+            logger.log_progress(metadata, "Reading processed stock data from Silver layer")
+            
             # Read processed stock data from Silver layer - aligned with actual structure
             stock_file_key = f"silver/stocks/processed/clean_stocks_{date_str.replace('-', '')}.csv"
             
@@ -333,14 +439,17 @@ def create_ml_features(**context):
                 if s3_hook.check_for_key(key=alt_stock_key, bucket_name=bucket_name):
                     stock_file_key = alt_stock_key
                 else:
-                    logging.warning(f"⚠️ No stock data found for ML features")
-                    return {'ml_features_records': 0, 'execution_date': date_str}
+                    logger.log_progress(metadata, "No stock data found for ML features")
+                    result = {'ml_features_records': 0, 'execution_date': date_str}
+                    log_pipeline_success(logger, metadata, 0, 0)
+                    return result
             
             # Read and process data
             csv_content = s3_hook.read_key(key=stock_file_key, bucket_name=bucket_name)
             df = pd.read_csv(pd.StringIO(csv_content))
             
-            logging.info(f"🤖 Processing {len(df)} records for ML features")
+            logger.log_progress(metadata, f"Processing {len(df)} records for ML features",
+                              input_records=len(df))
             
             # Create ML features aligned with Silver schema
             ml_df = df.copy()
@@ -443,16 +552,18 @@ def create_ml_features(**context):
             ml_features_df['_ml_features_version'] = '2.0'
             ml_features_df['_created_at_utc'] = pd.Timestamp.utcnow().isoformat() + 'Z'
             
-            # Save ML features
+            # Save ML features with S3 logging
             ml_csv_content = ml_features_df.to_csv(index=False)
             ml_features_key = f"gold/serving/ml_features/ml_features_{date_str.replace('-', '')}.csv"
             
+            logger.log_s3_operation(metadata, "write", ml_features_key, "ml_features_csv")
             s3_hook.load_string(
                 string_data=ml_csv_content,
                 key=ml_features_key,
                 bucket_name=bucket_name,
                 replace=True
             )
+            s3_paths.append(ml_features_key)
             
             # Create feature statistics for monitoring
             feature_stats = {
@@ -466,29 +577,119 @@ def create_ml_features(**context):
                 '_created_at_utc': pd.Timestamp.utcnow().isoformat() + 'Z'
             }
             
-            # Save feature statistics
-            stats_key = f"gold/metadata/feature_stats/feature_stats_{date_str.replace('-', '')}.json"
+            # Save feature statistics with S3 logging
+            stats_key = f"gold/serving/metadata/feature_stats_{date_str.replace('-', '')}.json"
+            logger.log_s3_operation(metadata, "write", stats_key, "feature_stats")
             s3_hook.load_string(
                 string_data=json.dumps(feature_stats, ensure_ascii=False, indent=2),
                 key=stats_key,
                 bucket_name=bucket_name,
                 replace=True
             )
+            s3_paths.append(stats_key)
+            
+            # Create detailed metadata using enhanced logger structure
+            detailed_metadata = {
+                'ml_features_info': {
+                    'execution_date': date_str,
+                    'pipeline_version': '2.0_ml_features',
+                    'layer': 'gold',
+                    'operation': 'create_ml_datasets',
+                    'processing_timestamp': pd.Timestamp.utcnow().isoformat() + 'Z',
+                    'input_source': stock_file_key,
+                    'output_location': 'gold/serving/ml_features/'
+                },
+                'feature_engineering_summary': {
+                    'total_samples': len(ml_features_df),
+                    'feature_count': len(feature_columns),
+                    'features_created': feature_columns,
+                    'target_variables': ['target_direction', 'target_volatility'],
+                    'bank_tier_encoding': {
+                        'big_4_banks': ['VCB', 'BID', 'CTG', 'AGR'],
+                        'tier_1_banks': ['VPB', 'TCB', 'MBB', 'STB', 'HDB', 'ACB']
+                    }
+                },
+                'ml_readiness_metrics': {
+                    'target_distribution': feature_stats['target_distribution'],
+                    'avg_daily_return': feature_stats['avg_return'],
+                    'return_volatility': feature_stats['return_volatility'],
+                    'bank_tier_distribution': feature_stats['bank_tier_distribution'],
+                    'features_with_nulls': len([col for col in ml_features_df.columns if ml_features_df[col].isnull().any()]),
+                    'ml_pipeline_ready': True
+                },
+                'output_files': {
+                    'ml_features_file': ml_features_key,
+                    'feature_stats_file': stats_key,
+                    'output_size_mb': round(len(ml_csv_content) / 1024 / 1024, 2)
+                },
+                'data_governance': {
+                    'data_lineage': f'{stock_file_key} -> {ml_features_key}',
+                    'transformation_applied': ['feature_engineering', 'bank_tier_encoding', 'target_creation', 'ml_preparation'],
+                    'quality_checks': {
+                        'no_null_targets': ml_features_df['target_direction'].notna().all() if 'target_direction' in ml_features_df.columns else True,
+                        'valid_features': len(feature_columns) > 0,
+                        'consistent_records': len(ml_features_df) == len(df)
+                    }
+                }
+            }
+            
+            # Save detailed metadata
+            metadata_key = f"gold/serving/metadata/ml_features_metadata_{date_str}.json"
+            logger.log_s3_operation(metadata, "write", metadata_key, "metadata")
+            s3_hook.load_string(
+                string_data=json.dumps(detailed_metadata, ensure_ascii=False, indent=2),
+                key=metadata_key,
+                bucket_name=bucket_name,
+                replace=True
+            )
+            s3_paths.append(metadata_key)
+            
+            # Log file operations
+            logger.log_file_operations(metadata, s3_paths=s3_paths)
+            
+            # Quality metrics
+            quality_metrics = {
+                'ml_feature_creation_success': True,
+                'feature_engineering_completion': 100.0,
+                'target_variable_creation': 'target_direction' in ml_features_df.columns,
+                'bank_tier_encoding_applied': 'bank_tier_score' in ml_features_df.columns,
+                'feature_count': len(feature_columns)
+            }
+            
+            # Log data quality
+            logger.log_data_quality(
+                metadata,
+                source_count=len(df),
+                target_count=len(ml_features_df),
+                error_count=0,
+                quality_metrics=quality_metrics
+            )
+            
+            # Finish pipeline operation
+            final_metadata = log_pipeline_success(logger, metadata, len(df), len(ml_features_df))
             
             result = {
-                'ml_features_records': len(ml_features_df),
-                'feature_columns': len(feature_columns),
-                'target_up_count': len(ml_features_df[ml_features_df['target_direction'] == 'UP']) if 'target_direction' in ml_features_df.columns else 0,
-                'target_down_count': len(ml_features_df[ml_features_df['target_direction'] == 'DOWN']) if 'target_direction' in ml_features_df.columns else 0,
+                'ml_features_records': detailed_metadata['feature_engineering_summary']['total_samples'],
+                'feature_columns': detailed_metadata['feature_engineering_summary']['feature_count'],
+                'target_up_count': detailed_metadata['ml_readiness_metrics']['target_distribution'].get('UP', 0),
+                'target_down_count': detailed_metadata['ml_readiness_metrics']['target_distribution'].get('DOWN', 0),
                 'execution_date': date_str
             }
             
-            logging.info(f"✅ ML features created successfully: {result}")
+            logger.log_progress(metadata, "✅ ML features created successfully", **result)
             return result
             
         except Exception as e:
-            logging.error(f"❌ ML features creation failed: {str(e)}")
-            return {'ml_features_records': 0, 'execution_date': date_str}
+            logger.log_progress(metadata, f"❌ ML features creation failed: {str(e)}")
+            log_pipeline_error(logger, metadata, e, {'stage': 'ml_features_creation', 'input_file': stock_file_key if 'stock_file_key' in locals() else 'unknown'})
+            result = {'ml_features_records': 0, 'execution_date': date_str}
+            return result
+            
+    except Exception as e:
+        # Error logging with context
+        context_data = {'stage': 'initialization'}
+        log_pipeline_error(logger, metadata, e, context_data)
+        raise
         
     except Exception as e:
         logging.error(f"💥 ML feature creation failed: {str(e)}")

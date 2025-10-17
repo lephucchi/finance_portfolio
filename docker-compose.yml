@@ -2,10 +2,10 @@ version: '3.8'
 
 x-airflow-common:
   &airflow-common
-  # Apache Airflow official image
-  # image: apache/airflow:2.7.1-python3.9
   # Use custom image with vnstock dependencies
   build: .
+  # Apache Airflow official image
+  # image: apache/airflow:2.9.2-python3.10
   environment:
     &airflow-common-env
     AIRFLOW__CORE__EXECUTOR: LocalExecutor
@@ -165,41 +165,6 @@ services:
       _AIRFLOW_WWW_USER_USERNAME: ${_AIRFLOW_WWW_USER_USERNAME:-admin}
       _AIRFLOW_WWW_USER_PASSWORD: ${_AIRFLOW_WWW_USER_PASSWORD:-admin123}
     user: "0:0"
-
-  # Install Python Dependencies
-  airflow-install-deps:
-    <<: *airflow-common
-    entrypoint: /bin/bash
-    command:
-      - -c
-      - |
-        echo "🔧 Installing Python dependencies..."
-        pip install --user --no-cache-dir \
-          vnstock==0.2.9.6 \
-          beautifulsoup4==4.12.3 \
-          boto3 \
-          requests \
-          pandas \
-          numpy \
-          textblob \
-          python-dotenv
-        echo "✅ Dependencies installed successfully"
-    depends_on:
-      - airflow-init
-    user: "${AIRFLOW_UID:-50000}:0"
-
-  # Airflow CLI (optional utility)
-  airflow-cli:
-    <<: *airflow-common
-    profiles:
-      - debug
-    environment:
-      <<: *airflow-common-env
-      CONNECTION_CHECK_MAX_COUNT: "0"
-    command:
-      - bash
-      - -c
-      - airflow
 
 volumes:
   postgres-db-volume:

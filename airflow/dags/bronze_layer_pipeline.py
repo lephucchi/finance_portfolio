@@ -22,7 +22,12 @@ import json
 # Import custom utilities
 import sys
 sys.path.append('/opt/airflow/plugins')
-from spark_utils import get_spark_manager, get_financial_processor, with_spark_session
+sys.path.append('/opt/airflow/utils')
+# Temporarily comment out Spark imports for testing
+# from spark_utils import get_spark_manager, get_financial_processor, with_spark_session
+
+# Import enhanced logging
+from enhanced_logger import get_enhanced_logger, log_pipeline_start, log_pipeline_success, log_pipeline_error
 
 # Default args
 default_args = {
@@ -52,47 +57,61 @@ dag = DAG(
 COMPREHENSIVE_STOCKS = [
     # === BANKING SECTOR ===
     # Big 4 banks
-    'VCB', 'BID', 'CTG', 'AGR',
+    'VCB'
+    #, 'BID', 'CTG', 'AGR',
     # Tier 1 banks  
-    'VPB', 'TCB', 'MBB', 'STB', 'HDB', 'ACB', 'TPB', 'VIB',
+    #'VPB', 'TCB', 'MBB', 'STB', 'HDB', 'ACB', 'TPB', 'VIB',
     # Tier 2 banks
-    'NAB', 'SHB', 'EIB', 'MSB', 'LPB', 'OCB', 'PGB', 'VAB',
-    'BAB', 'BVB', 'KLB', 'NVB', 'ABB', 'SEA', 'SACOM',
+    #'NAB', 'SHB', 'EIB', 'MSB', 'LPB', 'OCB', 'PGB', 'VAB',
+    #'BAB', 'BVB', 'KLB', 'NVB', 'ABB', 'SEA', 'SACOM',
     
     # === SECURITIES SECTOR ===
-    'SSI', 'VCI', 'VND', 'HCM', 'SHS', 'VIX', 'BSI', 'FTS',
-    'MBS', 'CTS', 'TVB', 'PSI', 'APS', 'BVS', 'AGR', 'EVS',
+    #'SSI', 'VCI', 'VND', 'HCM', 'SHS', 'VIX', 'BSI', 'FTS',
+    #'MBS', 'CTS', 'TVB', 'PSI', 'APS', 'BVS', 'AGR', 'EVS',
     
     # === BLUE CHIP STOCKS ===
-    'VNM', 'SAB', 'FPT', 'HPG', 'VIC', 'MSN', 'REE', 'VHM',
-    'BCM', 'GMD', 'PNJ', 'DGC', 'CTD', 'HSG', 'NVL', 'PDR',
-    'VPI', 'KDH', 'BWE', 'DXG', 'IJC', 'BCG', 'VGC', 'VCG',
+    #'VNM', 'SAB', 'FPT', 'HPG', 'VIC', 'MSN', 'REE', 'VHM',
+    #'BCM', 'GMD', 'PNJ', 'DGC', 'CTD', 'HSG', 'NVL', 'PDR',
+    #'VPI', 'KDH', 'BWE', 'DXG', 'IJC', 'BCG', 'VGC', 'VCG',
     
     # === ENERGY & UTILITIES ===
-    'GAS', 'PLX', 'PVD', 'PVC', 'PVS', 'PVT', 'POW', 'REE',
-    'VSH', 'NT2', 'SBA', 'PC1', 'EVN', 'GEG', 'SHP',
+   # 'GAS', 'PLX', 'PVD', 'PVC', 'PVS', 'PVT', 'POW', 'REE',
+    #'VSH', 'NT2', 'SBA', 'PC1', 'EVN', 'GEG', 'SHP',
     
     # === MANUFACTURING ===
-    'HPG', 'HSG', 'NKG', 'TLG', 'SMC', 'VGS', 'TVN', 'VIS',
-    'AAA', 'ANV', 'BMP', 'CMG', 'DCM', 'DGC', 'DHG', 'GIL',
+    #'HPG', 'HSG', 'NKG', 'TLG', 'SMC', 'VGS', 'TVN', 'VIS',
+    #'AAA', 'ANV', 'BMP', 'CMG', 'DCM', 'DGC', 'DHG', 'GIL',
     
     # === REAL ESTATE ===
-    'VHM', 'VIC', 'VRE', 'KDH', 'NVL', 'PDR', 'DXG', 'BCG',
-    'CEO', 'CII', 'HDG', 'IJC', 'KBC', 'LDG', 'NBB', 'NTL',
+    #'VHM', 'VIC', 'VRE', 'KDH', 'NVL', 'PDR', 'DXG', 'BCG',
+    #'CEO', 'CII', 'HDG', 'IJC', 'KBC', 'LDG', 'NBB', 'NTL',
     
     # === FOOD & BEVERAGE ===
-    'VNM', 'SAB', 'MSN', 'MCH', 'KDC', 'CNG', 'LSS', 'VHC',
-    'QNS', 'SBT', 'TNG', 'UIC', 'VCF', 'VGP', 'VOC',
+   # 'VNM', 'SAB', 'MSN', 'MCH', 'KDC', 'CNG', 'LSS', 'VHC',
+    #'QNS', 'SBT', 'TNG', 'UIC', 'VCF', 'VGP', 'VOC',
     
     # === TECHNOLOGY ===
-    'FPT', 'CMG', 'ELC', 'ITD', 'SAM', 'VCS', 'VGI',
+    #'FPT', 'CMG', 'ELC', 'ITD', 'SAM', 'VCS', 'VGI',
     
     # === RETAIL & SERVICES ===
-    'MWG', 'PNJ', 'FRT', 'HAG', 'DGW', 'SFG', 'VRE', 'VNG'
+    #'MWG', 'PNJ', 'FRT', 'HAG', 'DGW', 'SFG', 'VRE', 'VNG'
 ]
 
 def extract_vnstock_data(**context):
     """Extract stock data using VNStock API based on bronze_stocks.py logic"""
+    # Initialize enhanced logger
+    logger = get_enhanced_logger("bronze_stocks_extraction", "INFO")
+    
+    # Start pipeline operation tracking
+    metadata = log_pipeline_start(
+        logger,
+        pipeline_name="vnstock_data_extraction", 
+        layer="bronze",
+        operation="extract_stock_data",
+        dag_run_id=context.get('dag_run').run_id,
+        task_id=context.get('task_instance').task_id
+    )
+    
     try:
         import vnstock3 as vs
         from airflow.providers.amazon.aws.hooks.s3 import S3Hook
@@ -102,7 +121,7 @@ def extract_vnstock_data(**context):
         execution_date = context['execution_date']
         date_str = execution_date.strftime('%Y-%m-%d')
         
-        logging.info(f"🏦 Extracting VNStock data for {date_str}")
+        logger.log_progress(metadata, f"Starting VNStock data extraction for {date_str}")
         
         # Initialize VNStock and S3
         vnstock = vs.Vnstock()
@@ -112,32 +131,37 @@ def extract_vnstock_data(**context):
         # Extended stocks list from comprehensive list
         comprehensive_stocks = [
             # Banking sector (Core focus)
-            'VCB', 'BID', 'CTG', 'AGR', 'VPB', 'TCB', 'MBB', 'STB', 'HDB', 'ACB', 'TPB', 'VIB',
-            'NAB', 'SHB', 'EIB', 'MSB', 'LPB', 'OCB', 'PGB', 'VAB', 'BAB', 'BVB', 'KLB', 'NVB',
-            
-            # Blue chip stocks  
-            'VNM', 'SAB', 'FPT', 'HPG', 'VIC', 'MSN', 'REE', 'VHM', 'BCM', 'GMD', 'PNJ', 'DGC',
-            'CTD', 'HSG', 'NVL', 'PDR', 'VPI', 'KDH', 'BWE', 'DXG', 'IJC', 'BCG', 'VGC', 'VCG',
+            'VCB'
+            #, 'BID', 'CTG', 'AGR', 'VPB', 'TCB', 'MBB', 'STB', 'HDB', 'ACB', 'TPB', 'VIB',
+            #'NAB', 'SHB', 'EIB', 'MSB', 'LPB', 'OCB', 'PGB', 'VAB', 'BAB', 'BVB', 'KLB', 'NVB',
+            # Blue chip stocks
+            #'VNM', 'SAB', 'FPT', 'HPG', 'VIC', 'MSN', 'REE', 'VHM', 'BCM', 'GMD', 'PNJ', 'DGC',
+            #'CTD', 'HSG', 'NVL', 'PDR', 'VPI', 'KDH', 'BWE', 'DXG', 'IJC', 'BCG', 'VGC', 'VCG',
             
             # Securities sector
-            'SSI', 'VCI', 'VND', 'HCM', 'SHS', 'VIX', 'BSI', 'FTS', 'MBS', 'CTS', 'TVB', 'PSI',
+            #'SSI', 'VCI', 'VND', 'HCM', 'SHS', 'VIX', 'BSI', 'FTS', 'MBS', 'CTS', 'TVB', 'PSI',
             
             # Energy & Utilities
-            'GAS', 'PLX', 'PVD', 'PVC', 'PVS', 'POW', 'VSH', 'NT2', 'SBA', 'PC1',
+            #'GAS', 'PLX', 'PVD', 'PVC', 'PVS', 'POW', 'VSH', 'NT2', 'SBA', 'PC1',
             
             # Manufacturing  
-            'NKG', 'TLG', 'SMC', 'VGS', 'TVN', 'VIS', 'AAA', 'ANV', 'BMP', 'CMG', 'DCM', 'DHG',
+            #'NKG', 'TLG', 'SMC', 'VGS', 'TVN', 'VIS', 'AAA', 'ANV', 'BMP', 'CMG', 'DCM', 'DHG',
             
             # Technology
-            'CMG', 'ELC', 'ITD', 'SAM', 'VCS', 'VGI',
+            #'CMG', 'ELC', 'ITD', 'SAM', 'VCS', 'VGI',
             
             # Retail & Services
-            'MWG', 'FRT', 'HAG', 'DGW', 'SFG', 'VRE', 'VNG'
+            #'MWG', 'FRT', 'HAG', 'DGW', 'SFG', 'VRE', 'VNG'
         ]
+        
+        logger.log_progress(metadata, f"Processing {len(comprehensive_stocks)} stocks", 
+                          stock_count=len(comprehensive_stocks), 
+                          stocks=comprehensive_stocks)
         
         successful_stocks = []
         failed_stocks = []
         total_files_uploaded = 0
+        s3_paths = []
         
         for ticker in comprehensive_stocks:
             try:
@@ -200,40 +224,72 @@ def extract_vnstock_data(**context):
                         )
                         
                         total_files_uploaded += 1
+                        s3_paths.append(s3_key)
                         
                     except Exception as upload_error:
-                        logging.error(f"❌ {ticker}: Upload failed: {str(upload_error)}")
+                        logger.log_progress(metadata, f"Upload failed for {ticker}: {str(upload_error)}")
                         continue
                 
                 successful_stocks.append(ticker)
-                logging.info(f"✅ {ticker}: Successfully processed")
+                logger.log_progress(metadata, f"Successfully processed {ticker}", 
+                                  ticker=ticker, files_uploaded=len(s3_paths))
                 
             except Exception as e:
-                logging.error(f"❌ Failed to process {ticker}: {str(e)}")
+                logger.log_progress(metadata, f"Failed to process {ticker}: {str(e)}")
                 failed_stocks.append(ticker)
                 continue
         
-        # Create and upload metadata (following bronze_stocks.py pattern)
+        # Log file operations
+        logger.log_file_operations(metadata, s3_paths=s3_paths)
+        
+        # Quality metrics
+        quality_metrics = {
+            'success_rate': (len(successful_stocks) / len(comprehensive_stocks) * 100) if comprehensive_stocks else 0,
+            'total_tickers_processed': len(comprehensive_stocks),
+            'api_success_rate': (len(successful_stocks) / len(comprehensive_stocks) * 100) if comprehensive_stocks else 0
+        }
+        
+        # Log data quality
+        logger.log_data_quality(
+            metadata,
+            source_count=len(comprehensive_stocks),
+            target_count=total_files_uploaded,
+            error_count=len(failed_stocks),
+            quality_metrics=quality_metrics
+        )
+        
+        # Create detailed metadata for this specific data extraction (KEEP DETAILED METADATA)
         summary_metadata = {
+            'extraction_info': {
+                'execution_date': date_str,
+                'extraction_timestamp': datetime.utcnow().isoformat() + 'Z',
+                'pipeline_version': '3.0_enhanced_logging',
+                'data_source': 'vnstock_v3',
+                'layer': 'bronze'
+            },
             'ingestion_summary': {
                 'total_tickers_processed': len(comprehensive_stocks),
                 'successful_tickers': len(successful_stocks),
                 'failed_tickers': len(failed_stocks),
-                'success_rate': f"{(len(successful_stocks) / len(comprehensive_stocks) * 100):.2f}%",
+                'success_rate': f"{quality_metrics['success_rate']:.2f}%",
                 'total_files_uploaded': total_files_uploaded
             },
-            'successful_tickers': successful_stocks,
-            'failed_tickers': failed_stocks,
+            'tickers_detail': {
+                'successful_tickers': successful_stocks,
+                'failed_tickers': failed_stocks,
+                'comprehensive_stocks_list': comprehensive_stocks
+            },
             'data_structure': {
                 'raw_data_path': "bronze/stocks/raw",
-                'metadata_path': "bronze/stocks/metadata"
+                'metadata_path': "bronze/stocks/metadata",
+                'file_pattern': "{ticker}_{date}.json"
             },
-            '_ingest_time_utc': datetime.utcnow().isoformat() + 'Z',
-            '_schema_version': '1.0'
+            'quality_metrics': quality_metrics,
+            '_schema_version': '2.0'
         }
         
-        # Upload summary metadata
-        metadata_key = f"bronze/stocks/metadata/ingestion_summary_{date_str}.json"
+        # Save detailed metadata to specific location (REQUIRED for data governance)
+        metadata_key = f"bronze/stocks/metadata/stocks_extraction_metadata_{date_str}.json"
         s3_hook.load_string(
             string_data=json.dumps(summary_metadata, ensure_ascii=False, indent=2),
             key=metadata_key,
@@ -245,18 +301,42 @@ def extract_vnstock_data(**context):
             'stocks_processed': len(successful_stocks),
             'failed_stocks': len(failed_stocks),
             'total_files': total_files_uploaded,
-            'execution_date': date_str
+            'execution_date': date_str,
+            'metadata_saved': metadata_key
         }
         
-        logging.info(f"📊 VNStock Extraction Summary: {result}")
+        # Finish pipeline operation tracking (logs only - no metadata to S3)
+        final_metadata = log_pipeline_success(logger, metadata, len(comprehensive_stocks), total_files_uploaded)
+        
+        logger.log_progress(metadata, f"VNStock Extraction completed successfully", **result)
         return result
         
     except Exception as e:
-        logging.error(f"💥 VNStock extraction failed: {str(e)}")
+        # Error logging with context
+        context_data = {
+            'total_stocks_planned': len(comprehensive_stocks) if 'comprehensive_stocks' in locals() else 0,
+            'stocks_processed': len(successful_stocks) if 'successful_stocks' in locals() else 0,
+            'files_uploaded': total_files_uploaded if 'total_files_uploaded' in locals() else 0
+        }
+        
+        log_pipeline_error(logger, metadata, e, context_data)
         raise
 
 def extract_news_data(**context):
     """Extract financial news based on bronze_news.py logic"""
+    # Initialize enhanced logger  
+    logger = get_enhanced_logger("bronze_news_extraction", "INFO")
+    
+    # Start pipeline operation tracking
+    metadata = log_pipeline_start(
+        logger,
+        pipeline_name="financial_news_extraction",
+        layer="bronze", 
+        operation="extract_news_data",
+        dag_run_id=context.get('dag_run').run_id,
+        task_id=context.get('task_instance').task_id
+    )
+    
     try:
         import requests
         from bs4 import BeautifulSoup
@@ -267,7 +347,7 @@ def extract_news_data(**context):
         execution_date = context['execution_date']
         date_str = execution_date.strftime('%Y-%m-%d')
         
-        logging.info(f"📰 Extracting news data for {date_str}")
+        logger.log_progress(metadata, f"Starting financial news extraction for {date_str}")
         
         # Initialize S3
         s3_hook = S3Hook(aws_conn_id='aws_default')
@@ -430,9 +510,10 @@ def extract_news_data(**context):
                         
                         all_news_data.append(news_data)
                         source_articles += 1
+                        s3_paths.append(s3_key)
                         
                     except Exception as article_error:
-                        logging.warning(f"⚠️ Failed to process article from {source['name']}: {str(article_error)}")
+                        logger.log_progress(metadata, f"Failed to process article from {source['name']}: {str(article_error)}")
                         continue
                 
                 successful_sources.append({
@@ -440,37 +521,69 @@ def extract_news_data(**context):
                     'articles_collected': source_articles
                 })
                 
-                logging.info(f"✅ {source['name']}: {source_articles} articles collected")
+                logger.log_progress(metadata, f"Collected {source_articles} articles from {source['name']}", 
+                                  source=source['name'], articles=source_articles)
                 
                 # Rate limiting
                 import time
                 time.sleep(2)
                 
             except Exception as source_error:
-                logging.error(f"❌ Failed to fetch from {source['name']}: {str(source_error)}")
+                logger.log_progress(metadata, f"Failed to fetch from {source['name']}: {str(source_error)}")
                 failed_sources.append(source['name'])
                 continue
         
-        # Create and upload metadata
+        # Log file operations
+        logger.log_file_operations(metadata, s3_paths=s3_paths)
+        
+        # Quality metrics
+        quality_metrics = {
+            'source_success_rate': (len(successful_sources) / len(news_sources) * 100) if news_sources else 0,
+            'avg_articles_per_source': (len(all_news_data) / len(successful_sources)) if successful_sources else 0,
+            'total_sources_processed': len(news_sources)
+        }
+        
+        # Log data quality
+        logger.log_data_quality(
+            metadata,
+            source_count=len(news_sources),
+            target_count=len(all_news_data),
+            error_count=len(failed_sources),
+            quality_metrics=quality_metrics
+        )
+        
+        # Create detailed news metadata (KEEP DETAILED METADATA)
         news_metadata = {
+            'extraction_info': {
+                'execution_date': date_str,
+                'extraction_timestamp': datetime.utcnow().isoformat() + 'Z',
+                'pipeline_version': '3.0_enhanced_logging',
+                'layer': 'bronze',
+                'data_type': 'financial_news'
+            },
             'ingestion_summary': {
                 'total_sources_processed': len(news_sources),
                 'successful_sources': len(successful_sources),
                 'failed_sources': len(failed_sources),
-                'total_articles_collected': len(all_news_data)
+                'total_articles_collected': len(all_news_data),
+                'success_rate': quality_metrics['source_success_rate']
             },
-            'source_details': successful_sources,
-            'failed_sources': failed_sources,
+            'sources_detail': {
+                'successful_sources': successful_sources,
+                'failed_sources': failed_sources,
+                'avg_articles_per_source': quality_metrics['avg_articles_per_source']
+            },
             'data_structure': {
-                'raw_data_path': f"bronze/news/raw/{date_str}",
-                'metadata_path': "bronze/news/metadata"
+                'raw_data_path': "bronze/news/raw",
+                'metadata_path': "bronze/news/metadata",
+                'file_pattern': "{article_id}.json"
             },
-            '_ingest_time_utc': datetime.utcnow().isoformat() + 'Z',
-            '_schema_version': '1.0'
+            'quality_metrics': quality_metrics,
+            '_schema_version': '2.0'
         }
         
-        # Upload news metadata
-        metadata_key = f"bronze/news/metadata/news_ingestion_summary_{date_str}.json"
+        # Save detailed metadata (REQUIRED for data governance)
+        metadata_key = f"bronze/news/metadata/news_extraction_metadata_{date_str}.json"
         s3_hook.load_string(
             string_data=json.dumps(news_metadata, ensure_ascii=False, indent=2),
             key=metadata_key,
@@ -482,14 +595,25 @@ def extract_news_data(**context):
             'articles_collected': len(all_news_data),
             'sources_processed': len(successful_sources),
             'failed_sources': len(failed_sources),
-            'execution_date': date_str
+            'execution_date': date_str,
+            'metadata_saved': metadata_key
         }
         
-        logging.info(f"📰 News Extraction Summary: {result}")
+        # Finish pipeline operation tracking (logs only - no metadata to S3)
+        final_metadata = log_pipeline_success(logger, metadata, len(news_sources), len(all_news_data))
+        
+        logger.log_progress(metadata, "News extraction completed successfully", **result)
         return result
         
     except Exception as e:
-        logging.error(f"💥 News extraction failed: {str(e)}")
+        # Error logging with context
+        context_data = {
+            'total_sources_planned': len(news_sources) if 'news_sources' in locals() else 0,
+            'articles_collected': len(all_news_data) if 'all_news_data' in locals() else 0,
+            'sources_processed': len(successful_sources) if 'successful_sources' in locals() else 0
+        }
+        
+        log_pipeline_error(logger, metadata, e, context_data)
         raise
 
 def extract_others_data(**context):

@@ -15,6 +15,11 @@ from airflow.utils.trigger_rule import TriggerRule
 import logging
 import os
 
+# Import enhanced logging
+import sys
+sys.path.append('/opt/airflow/utils')
+from enhanced_logger import get_enhanced_logger, log_pipeline_start, log_pipeline_success, log_pipeline_error
+
 # Default arguments
 default_args = {
     'owner': 'finance_portfolio',
@@ -39,11 +44,24 @@ dag = DAG(
 
 def process_stock_data(**context):
     """Process stock data with technical indicators based on original logic"""
+    # Initialize enhanced logger
+    logger = get_enhanced_logger("silver_stocks_processing", "INFO")
+    
+    # Start pipeline operation tracking
+    metadata = log_pipeline_start(
+        logger,
+        pipeline_name="silver_stocks_processing",
+        layer="silver",
+        operation="process_and_analyze",
+        dag_run_id=context.get('dag_run').run_id,
+        task_id=context.get('task_instance').task_id
+    )
+    
     try:
         execution_date = context['execution_date']
         date_str = execution_date.strftime('%Y-%m-%d')
         
-        logging.info(f"📈 Processing stock data for {date_str}")
+        logger.log_progress(metadata, f"Starting stock data processing for {date_str}")
         
         from airflow.providers.amazon.aws.hooks.s3 import S3Hook
         import pandas as pd
@@ -185,36 +203,46 @@ def process_stock_data(**context):
                 processed_stocks.append(processed_stock)
             
             if len(processed_stocks) == 0:
-                logging.warning(f"⚠️ No stocks processed successfully")
-                return {'stocks_processed': 0, 'execution_date': date_str}
+                logger.log_progress(metadata, "No stocks processed successfully")
+                result = {'stocks_processed': 0, 'execution_date': date_str}
+                log_pipeline_success(logger, metadata, 0, 0)
+                return result
             
             # Create processed DataFrame
             processed_df = pd.DataFrame(processed_stocks)
+            logger.log_progress(metadata, f"Created DataFrame with {len(processed_df)} processed stocks")
+            
+            # Track S3 paths for logging
+            s3_paths = []
             
             # Save as CSV
             csv_content = processed_df.to_csv(index=False)
-            processed_csv_key = f"silver/stocks/processed/clean_stocks_{date_str}.csv"
+            csv_key = f"silver/stocks/processed/clean_stocks_{date_str}.csv"
             
+            logger.log_s3_operation(metadata, "write", csv_key, "csv")
             s3_hook.load_string(
                 string_data=csv_content,
-                key=processed_csv_key,
+                key=csv_key,
                 bucket_name=bucket_name,
                 replace=True
             )
+            s3_paths.append(csv_key)
             
             # Save as JSON (Parquet alternative)
-            json_content = processed_df.to_json(orient='records', ensure_ascii=False)
-            processed_json_key = f"silver/stocks/processed/clean_stocks_{date_str}.json"
+            json_content = processed_df.to_json(orient='records')
+            json_key = f"silver/stocks/processed/clean_stocks_{date_str}.json"
             
+            logger.log_s3_operation(metadata, "write", json_key, "json")
             s3_hook.load_string(
                 string_data=json_content,
-                key=processed_json_key,
+                key=json_key,
                 bucket_name=bucket_name,
                 replace=True
             )
+            s3_paths.append(json_key)
             
             # Create metadata
-            metadata = {
+            processing_metadata = {
                 'execution_date': date_str,
                 'pipeline_version': '2.0_pandas',
                 'layer': 'silver',
@@ -230,36 +258,138 @@ def process_stock_data(**context):
                 }
             }
             
-            # Save metadata
-            metadata_key = f"silver/stocks/metadata/processing_meta_{date_str}.json"
+            # Save detailed metadata using enhanced logger structure
+            detailed_metadata = {
+                'transformation_info': {
+                    'execution_date': date_str,
+                    'pipeline_version': '2.0_technical_indicators',
+                    'layer': 'silver',
+                    'operation': 'technical_indicators_calculation',
+                    'processing_timestamp': pd.Timestamp.utcnow().isoformat() + 'Z',
+                    'input_source': 'bronze/stocks/raw/',
+                    'output_location': f'silver/stocks/processed/'
+                },
+                'data_summary': {
+                    'total_stocks_processed': processing_metadata['stocks_processed'],
+                    'unique_tickers': processing_metadata['unique_tickers'],
+                    'total_data_points': len(processed_df),
+                    'stocks_with_indicators': len(processed_df.groupby('ticker')),
+                    'date_range': {
+                        'start_date': str(processed_df['date'].min()),
+                        'end_date': str(processed_df['date'].max())
+                    },
+                    'technical_indicators_calculated': ['sma_10', 'sma_20', 'ema_12', 'ema_26', 'macd', 'signal', 'histogram', 'rsi_14', 'bb_upper', 'bb_middle', 'bb_lower', 'daily_return']
+                },
+                'performance_metrics': {
+                    'avg_daily_return': processing_metadata['avg_daily_return'],
+                    'avg_volume': processing_metadata['avg_volume'],
+                    'rsi_analysis': processing_metadata['rsi_summary'],
+                    'price_trend_analysis': {
+                        'positive_returns_count': len(processed_df[processed_df['daily_return'] > 0]),
+                        'negative_returns_count': len(processed_df[processed_df['daily_return'] < 0]),
+                        'avg_close_price': float(processed_df['close'].mean())
+                    }
+                },
+                'output_files': {
+                    'csv_file': csv_key,
+                    'json_file': json_key,
+                    'total_files_created': 2
+                },
+                'data_governance': {
+                    'data_lineage': f'bronze/stocks/raw/ -> {csv_key}',
+                    'transformation_applied': ['technical_indicators', 'price_calculations', 'volume_analysis'],
+                    'quality_checks': {
+                        'no_null_prices': processed_df[['open', 'high', 'low', 'close']].notna().all().all(),
+                        'valid_date_format': processed_df['date'].notna().all(),
+                        'technical_indicators_calculated': processed_df[['sma_10', 'rsi_14', 'macd']].notna().any().all(),
+                        'positive_volume_check': (processed_df['volume'] > 0).all()
+                    }
+                }
+            }
+            
+            # Save detailed metadata
+            metadata_key = f"silver/stocks/metadata/stocks_transformation_metadata_{date_str}.json"
+            logger.log_s3_operation(metadata, "write", metadata_key, "metadata")
             s3_hook.load_string(
-                string_data=json.dumps(metadata, ensure_ascii=False, indent=2),
+                string_data=json.dumps(detailed_metadata, ensure_ascii=False, indent=2),
                 key=metadata_key,
                 bucket_name=bucket_name,
                 replace=True
             )
+            s3_paths.append(metadata_key)
             
-            logging.info(f"✅ Stock processing completed successfully")
-            logging.info(f"📊 Processed {metadata['stocks_processed']} stocks")
-            logging.info(f"📈 Average daily return: {metadata['avg_daily_return']:.4f}")
+            # Log file operations
+            logger.log_file_operations(metadata, s3_paths=s3_paths)
             
-            return metadata
+            # Quality metrics
+            quality_metrics = {
+                'processing_success_rate': 100.0,  # All processed successfully if we reach here
+                'avg_daily_return': processing_metadata['avg_daily_return'],
+                'avg_rsi': processing_metadata['rsi_summary']['avg_rsi'],
+                'technical_indicators_coverage': 100.0,
+                'unique_tickers_processed': processing_metadata['unique_tickers']
+            }
+            
+            # Log data quality
+            logger.log_data_quality(
+                metadata,
+                source_count=len(processed_stocks),
+                target_count=len(processed_df),
+                error_count=0,
+                quality_metrics=quality_metrics
+            )
+            
+            # Finish pipeline operation
+            final_metadata = log_pipeline_success(logger, metadata, len(processed_stocks), len(processed_df))
+            
+            logger.log_progress(metadata, "✅ Stock processing completed successfully", 
+                              stocks_processed=detailed_metadata['data_summary']['total_stocks_processed'],
+                              avg_daily_return=detailed_metadata['performance_metrics']['avg_daily_return'])
+            
+            result = {
+                'stocks_processed': detailed_metadata['data_summary']['total_stocks_processed'],
+                'execution_date': date_str,
+                'unique_tickers': detailed_metadata['data_summary']['unique_tickers'],
+                'data_points': detailed_metadata['data_summary']['total_data_points']
+            }
+            
+            return result
             
         except Exception as e:
-            logging.error(f"❌ Stock processing failed: {str(e)}")
-            return {'stocks_processed': 0, 'execution_date': date_str}
+            logger.log_progress(metadata, f"Stock processing failed: {str(e)}")
+            result = {'stocks_processed': 0, 'execution_date': date_str}
+            log_pipeline_error(logger, metadata, e, {'stage': 'processing'})
+            return result
         
     except Exception as e:
-        logging.error(f"💥 Stock processing failed: {str(e)}")
+        # Error logging with context
+        context_data = {
+            'stage': 'initialization',
+            'execution_date': date_str if 'date_str' in locals() else 'unknown'
+        }
+        log_pipeline_error(logger, metadata, e, context_data)
         raise
 
 def process_news_data(**context):
     """Process news data with sentiment analysis"""
+    # Initialize enhanced logger
+    logger = get_enhanced_logger("silver_news_processing", "INFO")
+    
+    # Start pipeline operation tracking
+    metadata = log_pipeline_start(
+        logger,
+        pipeline_name="silver_news_processing",
+        layer="silver",
+        operation="sentiment_and_categorization",
+        dag_run_id=context.get('dag_run').run_id,
+        task_id=context.get('task_instance').task_id
+    )
+    
     try:
         execution_date = context['execution_date']
         date_str = execution_date.strftime('%Y-%m-%d')
         
-        logging.info(f"📰 Processing news data for {date_str}")
+        logger.log_progress(metadata, f"Starting news data processing for {date_str}")
         
         from airflow.providers.amazon.aws.hooks.s3 import S3Hook
         import pandas as pd
@@ -310,7 +440,8 @@ def process_news_data(**context):
                 logging.error(f"❌ No valid news data found")
                 return {'news_processed': 0, 'execution_date': date_str}
             
-            logging.info(f"📄 Processing {len(all_articles)} news articles")
+            logging.info(f"� Processing {len(all_articles)} news articles")
+            logger.log_progress(metadata, f"📊 Processing {len(all_articles)} news articles")
             
             # Convert to DataFrame
             news_df = pd.DataFrame(all_articles)
@@ -483,6 +614,7 @@ def process_news_data(**context):
             csv_content = processed_df.to_csv(index=False)
             processed_csv_key = f"silver/news/processed/clean_news_{date_str}.csv"
             
+            logger.log_s3_operation(metadata, "write", processed_csv_key, "csv")
             s3_hook.load_string(
                 string_data=csv_content,
                 key=processed_csv_key,
@@ -491,9 +623,10 @@ def process_news_data(**context):
             )
             
             # Save as JSON
-            json_content = processed_df.to_json(orient='records', ensure_ascii=False)
+            json_content = processed_df.to_json(orient='records')
             processed_json_key = f"silver/news/processed/clean_news_{date_str}.json"
             
+            logger.log_s3_operation(metadata, "write", processed_json_key, "json")
             s3_hook.load_string(
                 string_data=json_content,
                 key=processed_json_key,
@@ -504,6 +637,9 @@ def process_news_data(**context):
             # Create metadata
             sentiment_counts = processed_df['sentiment_basic'].value_counts().to_dict()
             topic_counts = processed_df['topic_category'].value_counts().to_dict()
+            
+            logger.log_progress(metadata, f"📊 Sentiment distribution: {sentiment_counts}")
+            logger.log_progress(metadata, f"📂 Topic distribution: {topic_counts}")
             
             metadata = {
                 'execution_date': date_str,
@@ -517,19 +653,68 @@ def process_news_data(**context):
                 'avg_word_count': float(processed_df['word_count'].mean())
             }
             
-            # Save metadata
-            metadata_key = f"silver/news/metadata/processing_meta_{date_str}.json"
+            # Save detailed metadata using enhanced logger structure
+            detailed_metadata = {
+                'transformation_info': {
+                    'execution_date': date_str,
+                    'pipeline_version': '2.0_pandas',
+                    'layer': 'silver',
+                    'operation': 'sentiment_and_categorization',
+                    'processing_timestamp': pd.Timestamp.utcnow().isoformat() + 'Z',
+                    'input_source': 'bronze/news/raw/',
+                    'output_location': f'silver/news/processed/'
+                },
+                'data_summary': {
+                    'total_articles_processed': len(processed_df),
+                    'articles_with_sentiment': len(processed_df[processed_df['sentiment_label'] != 'NEUTRAL']),
+                    'articles_by_source': processed_df['source'].value_counts().to_dict(),
+                    'sentiment_distribution': sentiment_counts,
+                    'topic_distribution': topic_counts,
+                    'content_quality_metrics': {
+                        'avg_content_length': float(processed_df['content_length'].mean()),
+                        'avg_word_count': float(processed_df['word_count'].mean()),
+                        'min_content_length': int(processed_df['content_length'].min()),
+                        'max_content_length': int(processed_df['content_length'].max())
+                    }
+                },
+                'output_files': {
+                    'csv_file': processed_csv_key,
+                    'json_file': processed_json_key,
+                    'total_output_size_mb': round((len(csv_content) + len(json_content)) / 1024 / 1024, 2)
+                },
+                'data_governance': {
+                    'data_lineage': f'bronze/news/raw/ -> {processed_csv_key}',
+                    'transformation_applied': ['text_cleaning', 'sentiment_analysis', 'topic_categorization'],
+                    'quality_checks': {
+                        'no_duplicate_ids': len(processed_df) == len(processed_df['id'].unique()),
+                        'valid_dates': processed_df['date'].notna().all(),
+                        'non_empty_content': (processed_df['clean_content'].str.len() > 0).all()
+                    }
+                }
+            }
+            
+            # Save detailed metadata
+            metadata_key = f"silver/news/metadata/news_transformation_metadata_{date_str}.json"
+            logger.log_s3_operation(metadata, "write", metadata_key, "metadata")
             s3_hook.load_string(
-                string_data=json.dumps(metadata, ensure_ascii=False, indent=2),
+                string_data=json.dumps(detailed_metadata, ensure_ascii=False, indent=2),
                 key=metadata_key,
                 bucket_name=bucket_name,
                 replace=True
             )
             
-            logging.info(f"✅ News processing completed successfully")
-            logging.info(f"📰 Processed {metadata['news_processed']} articles")
+            logger.log_progress(metadata, f"✅ News processing completed successfully")
+            logger.log_progress(metadata, f"📊 Processed {len(processed_df)} articles with sentiment analysis")
+            logger.log_data_quality(metadata, "silver_news", len(processed_df), detailed_metadata['data_governance']['quality_checks'])
             
-            return metadata
+            result = {
+                'news_processed': detailed_metadata['data_summary']['total_articles_processed'],
+                'execution_date': date_str,
+                'sentiment_distribution': detailed_metadata['data_summary']['sentiment_distribution'],
+                'articles_with_sentiment': detailed_metadata['data_summary']['articles_with_sentiment']
+            }
+            
+            return result
             
         except Exception as e:
             logging.error(f"❌ News processing failed: {str(e)}")

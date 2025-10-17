@@ -121,7 +121,7 @@ def check_pipeline_dependencies(**context):
     
     missing_deps = []
     for dep_name, s3_prefix in dependencies.items():
-        if not s3_hook.check_for_prefix(prefix=s3_prefix, bucket_name=bucket_name):
+        if not s3_hook.check_for_prefix(prefix=s3_prefix, bucket_name=bucket_name, delimiter='/'):
             missing_deps.append(dep_name)
     
     if missing_deps:
@@ -275,7 +275,8 @@ health_check = BashOperator(
     echo "🔍 System Health Check"
     echo "Memory usage: $(free -h | grep '^Mem' | awk '{print $3 "/" $2}')"
     echo "Disk usage: $(df -h / | tail -1 | awk '{print $5 " used"}')"
-    echo "Docker containers: $(docker ps --format 'table {{.Names}}\t{{.Status}}' | grep -c 'Up')"
+    echo "Docker containers running: $(docker ps | grep -c Up || echo 'N/A')"
+    echo "Current time: $(date)"
     """,
     dag=dag,
 )
