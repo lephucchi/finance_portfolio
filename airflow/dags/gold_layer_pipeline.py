@@ -1,586 +1,2291 @@
-""""""
+# Gold Layer Pipeline - 4-Layer Analytics Architecture"""""""""""""""
 
-Gold Layer Pipeline (Aligned with S3_LAKEHOUSE_COMPLETE_STRUCTURE.md)Gold Layer DAG - Analytics & ML Feature Engineering with Spark
+# Creates analytics-ready datasets with technical indicators, sentiment analysis,
 
-========================================================================Creates business intelligence views and ML-ready datasets
+# serving cache, and pipeline metadata trackingGold Layer Pipeline - 4-Layer Analytics Architecture
 
 
 
-This DAG creates analytics tables from Silver layer with 4-layer architecture:Author: Banking Portfolio Team
+from datetime import datetime, timedelta=====================================================Gold Layer Pipeline - 4-Layer Analytics Architecture
 
-Version: 2.0 (Spark-enabled)
-
-Layer 1 - ANALYTICS: Business intelligence tablesDate: October 2025
-
-  - market_features: Technical indicators (MA, RSI, volatility)"""
-
-  - sector_performance: Sector aggregations
-
-  - news_summary: Daily news aggregationfrom datetime import datetime, timedelta
-
-  - macro_indicators: Macro trends with moving averagesfrom airflow import DAG
+from airflow import DAG
 
 from airflow.operators.python import PythonOperator
 
-Layer 2 - SENTIMENT_ANALYSIS: Sentiment aggregationsfrom airflow.operators.bash import BashOperator
-
-  - News sentiment by date/sourcefrom airflow.operators.dummy import DummyOperator
-
 from airflow.providers.amazon.aws.hooks.s3 import S3Hook
 
-Layer 3 - SERVING: Pre-aggregated cache for BI dashboardsfrom airflow.utils.trigger_rule import TriggerRule
-
-  - market_dashboard, sentiment_features, macro_features, risk_metricsfrom airflow.utils.dates import days_ago
-
-import logging
-
-Layer 4 - METADATA: Pipeline lineage and quality trackingimport os
-
-  - pipeline_runs: Execution tracking with lineageimport json
-
-  - quality_metrics: Data quality per tableimport pandas as pd
+import pandas as pdCreates analytics-ready datasets with technical indicators, sentiment analysis,=====================================================Gold Layer Pipeline (Aligned with S3_LAKEHOUSE_COMPLETE_STRUCTURE.md)
 
 import numpy as np
 
-Schedule: Daily at 8 AM (weekdays), after Silver layer
+from io import BytesIOserving cache, and pipeline metadata tracking.
 
-Dependencies: pandas, pyarrow, numpy# Import custom utilities
-
-"""import sys
-
-sys.path.append('/opt/airflow/plugins')
-
-from airflow import DAGsys.path.append('/opt/airflow/utils')
-
-from airflow.operators.python import PythonOperator# Temporarily comment out Spark imports for testing
-
-from datetime import datetime, timedelta# from spark_utils import get_spark_manager, get_financial_processor, with_spark_session
+import json
 
 import logging
 
-import json# Import enhanced logging
+import sys
 
-import osfrom enhanced_logger import get_enhanced_logger, log_pipeline_start, log_pipeline_success, log_pipeline_error
+4-Layer Architecture:
 
-import pandas as pd
+sys.path.append('/opt/airflow/dags')
 
-import numpy as np# Default args
+from enhanced_logger import log_pipeline_start, log_pipeline_success, log_pipeline_error1. analytics/ - Market features (MA, RSI, volatility)Layer 1: Analytics - market_features with technical indicators========================================================================Gold Layer Pipeline (Aligned with S3_LAKEHOUSE_COMPLETE_STRUCTURE.md)Gold Layer DAG - Analytics & ML Feature Engineering with Spark
 
-import pyarrow as padefault_args = {
 
-import pyarrow.parquet as pq    'owner': 'banking-portfolio',
 
-import io    'depends_on_past': False,
+S3_BUCKET = 'bankanalystportfolio'2. sentiment_analysis/ - News sentiment by date/source
 
-from enhanced_logger import log_pipeline_start, log_pipeline_success, log_pipeline_error    'start_date': datetime(2025, 10, 16),
+S3_CONN_ID = 'aws_s3_conn'
+
+3. serving/ - Pre-aggregated BI cacheLayer 2: Sentiment Analysis - news sentiment aggregation  
+
+default_args = {
+
+    'owner': 'finance_portfolio',4. metadata/ - Pipeline lineage tracking
+
+    'depends_on_past': False,
+
+    'start_date': datetime(2024, 1, 1),Layer 3: Serving - pre-aggregated BI cache
 
     'email_on_failure': False,
 
-# Default arguments    'email_on_retry': False,
+    'email_on_retry': False,Author: finance_portfolio
 
-default_args = {    'retries': int(os.getenv('MAX_RETRY_ATTEMPTS', 2)),
+    'retries': 2,
 
-    'owner': 'finance_portfolio',    'retry_delay': timedelta(minutes=5),
+    'retry_delay': timedelta(minutes=5),"""Layer 4: Metadata - pipeline lineage tracking
 
-    'depends_on_past': False,    'execution_timeout': timedelta(hours=2),
+}
 
-    'start_date': datetime(2024, 1, 1),}
 
-    'email_on_failure': True,
 
-    'email_on_retry': False,# DAG definition
+dag = DAG(
 
-    'retries': 3,dag = DAG(
+    'gold_layer_pipeline',from datetime import datetime, timedeltaThis DAG creates analytics tables from Silver layer with 4-layer architecture:========================================================================Creates business intelligence views and ML-ready datasets
 
-    'retry_delay': timedelta(minutes=5),    'gold_layer_pipeline',
+    default_args=default_args,
 
-    'execution_timeout': timedelta(hours=4),    default_args=default_args,
+    description='Gold Layer - 4-Layer Analytics Architecture',from airflow import DAG
 
-}    description='Gold Layer - Analytics & ML Feature Engineering with Spark',
+    schedule_interval='0 8 * * 1-5',
 
-    schedule_interval='0 8 * * 1-5',  # 8:00 AM weekdays (after Silver DAG)
+    catchup=False,from airflow.operators.python import PythonOperatorSchedule: 8 AM weekdays after Silver layer
 
-# DAG definition    catchup=False,
+    tags=['gold', 'analytics', 'ml-features']
 
-dag = DAG(    max_active_runs=1,
+)from airflow.providers.amazon.aws.hooks.s3 import S3Hook
 
-    'gold_layer_pipeline',    max_active_tasks=8,
 
-    default_args=default_args,    tags=['gold', 'analytics', 'spark', 'ml-features'],
 
-    description='Gold layer analytics (4-layer architecture: analytics/sentiment/serving/metadata)',)
+import pandas as pd"""
 
-    schedule_interval='0 8 * * 1-5',  # 8 AM weekdays
+def calculate_technical_indicators(df):
 
-    catchup=False,def create_analytics_tables(**context):
+    df = df.sort_values('date')import numpy as np
 
-    tags=['gold', 'lakehouse', 'analytics'],    """Create business intelligence tables based on gold_layer_etl.py logic"""
+    df['MA_5'] = df['close'].rolling(window=5).mean()
 
-    max_active_runs=1    # Initialize enhanced logger
+    df['MA_10'] = df['close'].rolling(window=10).mean()from io import BytesIO
 
-)    logger = get_enhanced_logger("gold_analytics_creation", "INFO")
+    df['MA_20'] = df['close'].rolling(window=20).mean()
+
+    df['MA_30'] = df['close'].rolling(window=30).mean()import json
 
     
 
-    # Start pipeline operation tracking
+    delta = df['close'].diff()import loggingfrom airflow import DAGLayer 1 - ANALYTICS: Business intelligence tables
 
-def create_market_features(**context):    metadata = log_pipeline_start(
+    gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
 
-    """        logger,
+    loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
 
-    Layer 1 - ANALYTICS: Create market_features table with technical indicators        pipeline_name="gold_analytics_creation",
+    rs = gain / loss
 
-    Input: silver/stocks/partition_date=*/stock_data.parquet        layer="gold",
+    df['RSI_14'] = 100 - (100 / (1 + rs))# Import enhanced loggerfrom airflow.operators.python import PythonOperator
 
-    Output: gold/analytics/market_features/partition_date=YYYY-MM-DD/*.parquet        operation="create_business_intelligence",
+    df['volatility_7d'] = df['close'].rolling(window=7).std()
 
-    """        dag_run_id=context.get('dag_run').run_id,
+    return dfimport sys
 
-    try:        task_id=context.get('task_instance').task_id
 
-        from airflow.providers.amazon.aws.hooks.s3 import S3Hook    )
 
-            
+sys.path.append('/opt/airflow/dags')from datetime import datetime, timedelta  - market_features: Technical indicators (MA, RSI, volatility)
 
-        execution_date = context['execution_date']    try:
+def create_market_features(**context):
 
-        date_str = execution_date.strftime('%Y-%m-%d')        execution_date = context['execution_date']
+    execution_date = context['execution_date']from enhanced_logger import log_pipeline_start, log_pipeline_success, log_pipeline_error
 
-                date_str = execution_date.strftime('%Y-%m-%d')
+    log_pipeline_start('gold_layer', 'create_market_features', execution_date)
 
-        logger = logging.getLogger(__name__)        
+    import logging
 
-        logger.info(f"📊 Creating market features for {date_str}")        logger.log_progress(metadata, f"Starting analytics tables creation for {date_str}")
+    try:
+
+        s3_hook = S3Hook(aws_conn_id=S3_CONN_ID)# Configuration
+
+        end_date = execution_date.date()
+
+        start_date = end_date - timedelta(days=30)S3_BUCKET = 'bankanalystportfolio'import json  - sector_performance: Sector aggregationsThis DAG creates analytics tables from Silver layer with 4-layer architecture:Author: Banking Portfolio Team
+
+        logging.info(f"Processing stocks from {start_date} to {end_date}")
+
+        S3_CONN_ID = 'aws_s3_conn'
+
+        silver_prefix = 'silver/stocks/'
+
+        all_files = s3_hook.list_keys(bucket_name=S3_BUCKET, prefix=silver_prefix)import os
+
+        
+
+        if not all_files:default_args = {
+
+            logging.warning("No Silver stock files found")
+
+            return    'owner': 'finance_portfolio',import pandas as pd  - news_summary: Daily news aggregation
+
+        
+
+        stock_files = [f for f in all_files if f.endswith('.parquet') and 'partition_date=' in f]    'depends_on_past': False,
+
+        all_stocks = []
+
+            'start_date': datetime(2024, 1, 1),import numpy as np
+
+        for file_key in stock_files:
+
+            try:    'email_on_failure': False,
+
+                partition_str = file_key.split('partition_date=')[1].split('/')[0]
+
+                partition_date = datetime.strptime(partition_str, '%Y-%m-%d').date()    'email_on_retry': False,import io  - macro_indicators: Macro trends with moving averagesVersion: 2.0 (Spark-enabled)
 
                 
 
-        metadata = {        from airflow.providers.amazon.aws.hooks.s3 import S3Hook
+                if start_date <= partition_date <= end_date:    'retries': 2,
 
-            'pipeline_name': 'gold_market_features',        import pandas as pd
+                    obj = s3_hook.get_key(file_key, bucket_name=S3_BUCKET)
 
-            'layer': 'gold',        import json
+                    parquet_data = obj.get()['Body'].read()    'retry_delay': timedelta(minutes=5),
 
-            'data_type': 'analytics',        
+                    df = pd.read_parquet(BytesIO(parquet_data))
 
-            'execution_date': date_str        # Initialize S3
+                    all_stocks.append(df)}
 
-        }        s3_hook = S3Hook(aws_conn_id='aws_default')
+            except Exception as e:
 
-                bucket_name = os.getenv('S3_BUCKET', 'bankanalystportfolio')
+                logging.error(f"Error reading {file_key}: {e}")from enhanced_logger import log_pipeline_start, log_pipeline_success, log_pipeline_error
 
-        log_pipeline_start(logger, metadata)        
+                continue
 
-                results = {
+        dag = DAG(
 
-        # Initialize S3            'market_summary_created': False,
+        if not all_stocks:
 
-        s3_hook = S3Hook(aws_conn_id='aws_default')            'stock_features_created': False,
+            logging.warning("No stock data in date range")    'gold_layer_pipeline',
 
-        bucket_name = os.getenv('S3_BUCKET', 'bankanalystportfolio')            'news_sentiment_created': False,
+            return
 
-                    'execution_date': date_str
+            default_args=default_args,
 
-        # Read Silver stocks data (last 30 days for MA calculation)        }
+        stocks_df = pd.concat(all_stocks, ignore_index=True)
 
-        logger.info(f"📂 Reading Silver stocks data...")        
+        results = []    description='Gold Layer - 4-Layer Analytics Architecture',# Default argumentsLayer 2 - SENTIMENT_ANALYSIS: Sentiment aggregationsLayer 1 - ANALYTICS: Business intelligence tablesDate: October 2025
 
-                s3_paths = []
+        for ticker in stocks_df['ticker'].unique():
 
-        # Get last 30 days of data for moving averages        processed_records = 0
+            ticker_df = stocks_df[stocks_df['ticker'] == ticker].copy()    schedule_interval='0 8 * * 1-5',  # 8 AM weekdays
 
-        all_stocks = []        
+            ticker_df = calculate_technical_indicators(ticker_df)
 
-        for i in range(30):        # 1. Create Market Summary from Silver stocks data
+            results.append(ticker_df)    catchup=False,default_args = {
 
-            past_date = (execution_date - timedelta(days=i)).strftime('%Y-%m-%d')        try:
+        
 
-            stock_key = f"silver/stocks/partition_date={past_date}/stock_data.parquet"            logger.log_progress(metadata, "Creating market summary from silver stocks data")
+        market_features_df = pd.concat(results, ignore_index=True)    tags=['gold', 'analytics', 'ml-features']
 
-                        
+        partition_date_str = end_date.strftime('%Y-%m-%d')
 
-            try:            # Read processed stock data from Silver layer - aligned with actual structure
+        gold_prefix = f'gold/analytics/market_features/partition_date={partition_date_str}/')    'owner': 'finance_portfolio',  - News sentiment by date/source
 
-                obj = s3_hook.get_conn().get_object(Bucket=bucket_name, Key=stock_key)            stock_file_key = f"silver/stocks/processed/clean_stocks_{date_str.replace('-', '')}.csv"
+        
 
-                df_day = pd.read_parquet(io.BytesIO(obj['Body'].read()))            
+        parquet_buffer = BytesIO()
 
-                all_stocks.append(df_day)            if not s3_hook.check_for_key(key=stock_file_key, bucket_name=bucket_name):
+        market_features_df.to_parquet(parquet_buffer, engine='pyarrow', compression='snappy', index=False)
 
-            except:                # Try alternative date format
+        parquet_buffer.seek(0)    'depends_on_past': False,
 
-                continue                alt_stock_key = f"silver/stocks/processed/clean_stocks_{date_str}.csv"
+        
 
-                        if s3_hook.check_for_key(key=alt_stock_key, bucket_name=bucket_name):
+        s3_key = f'{gold_prefix}market_features_{end_date.strftime("%Y%m%d")}.parquet'def calculate_technical_indicators(df: pd.DataFrame) -> pd.DataFrame:
 
-        if not all_stocks:                    stock_file_key = alt_stock_key
+        s3_hook.load_bytes(parquet_buffer.read(), key=s3_key, bucket_name=S3_BUCKET, replace=True)
 
-            logger.warning(f"⚠️ No stock data found for MA calculation")                else:
+            """Calculate technical indicators for stock data"""    'start_date': datetime(2024, 1, 1),  - market_features: Technical indicators (MA, RSI, volatility)"""
 
-            result = {'features_created': 0, 'execution_date': date_str}                    logger.log_progress(metadata, "No stock data found for market summary in either format")
+        metadata = {
 
-            log_pipeline_success(logger, metadata, result)                    results['market_summary_created'] = False
+            'execution_date': execution_date.isoformat(),    df = df.sort_values('date')
 
-            return result                
+            'date_range': {'start': start_date.isoformat(), 'end': end_date.isoformat()},
 
-                    if results['market_summary_created'] != False:  # Only proceed if we found data
+            'records_processed': len(market_features_df),        'email_on_failure': True,
 
-        df = pd.concat(all_stocks, ignore_index=True)                # Read silver stocks data
+            'tickers_count': market_features_df['ticker'].nunique(),
 
-        df['data_date'] = pd.to_datetime(df['data_date'])                csv_content = s3_hook.read_key(key=stock_file_key, bucket_name=bucket_name)
+            'features': ['MA_5', 'MA_10', 'MA_20', 'MA_30', 'RSI_14', 'volatility_7d']    # Moving Averages
 
-        df = df.sort_values(['symbol', 'data_date'])                stocks_df = pd.read_csv(pd.StringIO(csv_content))
+        }
 
-                        
+            df['MA_5'] = df['close'].rolling(window=5).mean()    'email_on_retry': False,Layer 3 - SERVING: Pre-aggregated cache for BI dashboards
 
-        logger.info(f"📝 Loaded {len(df)} stock records for {df['symbol'].nunique()} symbols")                logger.log_progress(metadata, f"Processing {len(stocks_df)} stock records for market summary",
+        metadata_key = f'{gold_prefix}_metadata.json'
 
-                                          stock_records=len(stocks_df))
+        s3_hook.load_string(json.dumps(metadata, indent=2), key=metadata_key, bucket_name=S3_BUCKET, replace=True)    df['MA_10'] = df['close'].rolling(window=10).mean()
 
-        # Calculate technical indicators per symbol                
+        
 
-        logger.info(f"📈 Calculating technical indicators...")                # Create market summary aligned with Silver schema
+        log_pipeline_success('gold_layer', 'create_market_features', len(market_features_df))    df['MA_20'] = df['close'].rolling(window=20).mean()    'retries': 3,
 
-                        market_summary = {
+        logging.info(f"Market features created: {len(market_features_df)} records")
 
-        features = []                    'date': date_str,
+            df['MA_30'] = df['close'].rolling(window=30).mean()
 
-                            'total_stocks': len(stocks_df),
+    except Exception as e:
 
-        for symbol in df['symbol'].unique():                    'avg_close_price': float(stocks_df['close'].mean()) if len(stocks_df) > 0 else 0,
+        log_pipeline_error('gold_layer', 'create_market_features', str(e))        'retry_delay': timedelta(minutes=5),  - market_dashboard, sentiment_features, macro_features, risk_metrics  - sector_performance: Sector aggregations
 
-            df_symbol = df[df['symbol'] == symbol].copy()                    'total_volume': int(stocks_df['volume'].sum()) if len(stocks_df) > 0 else 0,
+        raise
 
-            df_symbol = df_symbol.sort_values('data_date')                    'avg_daily_return': float(stocks_df['daily_return'].mean() if 'daily_return' in stocks_df.columns else 0),
+    # RSI (14-day)
 
-                                'price_gainers': len(stocks_df[stocks_df['daily_return'] > 0]) if 'daily_return' in stocks_df.columns and len(stocks_df) > 0 else 0,
 
-            # Only process if we have today's data                    'price_losers': len(stocks_df[stocks_df['daily_return'] < 0]) if 'daily_return' in stocks_df.columns and len(stocks_df) > 0 else 0,
 
-            if date_str not in df_symbol['data_date'].astype(str).values:                    'market_breadth_pct': (len(stocks_df[stocks_df['daily_return'] > 0]) / len(stocks_df) * 100) if 'daily_return' in stocks_df.columns and len(stocks_df) > 0 else 0,
+def create_sentiment_analysis(**context):    delta = df['close'].diff()    'execution_timeout': timedelta(hours=4),
 
-                continue                    'unique_symbols': int(stocks_df['symbol'].nunique()) if 'symbol' in stocks_df.columns else len(stocks_df),
+    execution_date = context['execution_date']
 
-                                '_created_at_utc': pd.Timestamp.utcnow().isoformat() + 'Z'
+    log_pipeline_start('gold_layer', 'create_sentiment_analysis', execution_date)    gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
 
-            # Moving Averages                }
+    
 
-            df_symbol['MA_5'] = df_symbol['close'].rolling(window=5, min_periods=1).mean()                
+    try:    loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()}
 
-            df_symbol['MA_10'] = df_symbol['close'].rolling(window=10, min_periods=1).mean()                # Save market summary to Gold analytics
+        s3_hook = S3Hook(aws_conn_id=S3_CONN_ID)
 
-            df_symbol['MA_20'] = df_symbol['close'].rolling(window=20, min_periods=1).mean()                market_summary_key = f"gold/analytics/market_summary/market_summary_{date_str.replace('-', '')}.json"
+        end_date = execution_date.date()    rs = gain / loss
 
-            df_symbol['MA_30'] = df_symbol['close'].rolling(window=30, min_periods=1).mean()                s3_hook.load_string(
+        start_date = end_date - timedelta(days=7)
 
-                                string_data=json.dumps(market_summary, ensure_ascii=False, indent=2),
+        logging.info(f"Processing news from {start_date} to {end_date}")    df['RSI_14'] = 100 - (100 / (1 + rs))
 
-            # RSI (14-day)                    key=market_summary_key,
+        
 
-            delta = df_symbol['close'].diff()                    bucket_name=bucket_name,
+        silver_prefix = 'silver/news/'    
 
-            gain = (delta.where(delta > 0, 0)).rolling(window=14, min_periods=1).mean()                    replace=True
+        all_files = s3_hook.list_keys(bucket_name=S3_BUCKET, prefix=silver_prefix)
 
-            loss = (-delta.where(delta < 0, 0)).rolling(window=14, min_periods=1).mean()                )
+            # Volatility (7-day)# DAG definitionLayer 4 - METADATA: Pipeline lineage and quality tracking  - news_summary: Daily news aggregationfrom datetime import datetime, timedelta
 
-            rs = gain / loss                
+        if not all_files:
 
-            df_symbol['RSI_14'] = 100 - (100 / (1 + rs))                results['market_summary_created'] = True
+            logging.warning("No Silver news files found")    df['volatility_7d'] = df['close'].rolling(window=7).std()
 
-                            logging.info(f"✅ Market summary created with {market_summary['total_stocks']} stocks")
+            return
 
-            # Volatility (7-day standard deviation)                
+            dag = DAG(
 
-            df_symbol['volatility_7d'] = df_symbol['close'].rolling(window=7, min_periods=1).std()            else:
+        news_files = [f for f in all_files if f.endswith('.parquet') and 'partition_date=' in f]
 
-                            logging.warning(f"⚠️ No stock data found for market summary")
+        all_news = []    return df
 
-            # Get today's row                
+        
 
-            today_row = df_symbol[df_symbol['data_date'].astype(str) == date_str].iloc[-1]        except Exception as e:
+        for file_key in news_files:    'gold_layer_pipeline',  - pipeline_runs: Execution tracking with lineage
 
-                        logging.error(f"❌ Market summary creation failed: {str(e)}")
+            try:
 
-            feature_record = {        
+                partition_str = file_key.split('partition_date=')[1].split('/')[0]
 
-                'symbol': symbol,        # 2. Create Stock Features for ML aligned with Silver schema
+                partition_date = datetime.strptime(partition_str, '%Y-%m-%d').date()
 
-                'data_date': date_str,        try:
+                def create_market_features(**context):    default_args=default_args,
 
-                'close': today_row['close'],            if results['market_summary_created']:
+                if start_date <= partition_date <= end_date:
 
-                'volume': today_row['volume'],                # Use existing stocks_df if market summary was created
+                    obj = s3_hook.get_key(file_key, bucket_name=S3_BUCKET)    """
 
-                'MA_5': round(today_row['MA_5'], 2) if pd.notna(today_row['MA_5']) else None,                if 'stocks_df' in locals() and not stocks_df.empty:
+                    parquet_data = obj.get()['Body'].read()
 
-                'MA_10': round(today_row['MA_10'], 2) if pd.notna(today_row['MA_10']) else None,                    # Create ML-ready features using actual Silver schema
+                    df = pd.read_parquet(BytesIO(parquet_data))    Layer 1 - ANALYTICS: Market Features    description='Gold layer - 4-layer analytics architecture',  - quality_metrics: Data quality per table  - macro_indicators: Macro trends with moving averagesfrom airflow import DAG
 
-                'MA_20': round(today_row['MA_20'], 2) if pd.notna(today_row['MA_20']) else None,                    ml_features = stocks_df.copy()
+                    all_news.append(df)
 
-                'MA_30': round(today_row['MA_30'], 2) if pd.notna(today_row['MA_30']) else None,                    
+            except Exception as e:    Read last 30 days of Silver stocks data, calculate technical indicators
 
-                'RSI_14': round(today_row['RSI_14'], 2) if pd.notna(today_row['RSI_14']) else None,                    # Ensure we have the required columns from Silver
+                logging.error(f"Error reading {file_key}: {e}")
 
-                'volatility_7d': round(today_row['volatility_7d'], 2) if pd.notna(today_row['volatility_7d']) else None,                    if 'symbol' in ml_features.columns:
+                continue    """    schedule_interval='0 8 * * 1-5',
 
-                'price_change': today_row.get('price_change', 0),                        ml_features['ticker'] = ml_features['symbol']  # Standardize naming
+        
 
-                'price_change_pct': today_row.get('price_change_pct', 0)                    
+        if not all_news:    execution_date = context['execution_date']
 
-            }                    # Price-based features using actual Silver columns
+            logging.warning("No news data in date range")
 
-                                if all(col in ml_features.columns for col in ['close', 'open']):
+            return    log_pipeline_start('gold_layer', 'create_market_features', execution_date)    catchup=False,
 
-            features.append(feature_record)                        ml_features['price_change_pct'] = (ml_features['close'] - ml_features['open']) / ml_features['open']
+        
 
-                            
+        news_df = pd.concat(all_news, ignore_index=True)    
 
-        df_features = pd.DataFrame(features)                    if all(col in ml_features.columns for col in ['high', 'low']):
+        
 
-                                ml_features['daily_range_pct'] = (ml_features['high'] - ml_features['low']) / ml_features['low']
+        if 'published_date' in news_df.columns:    try:    tags=['gold', 'analytics'],
 
-        logger.info(f"✅ Created features for {len(df_features)} symbols")                    
+            news_df['date'] = pd.to_datetime(news_df['published_date']).dt.date
 
-                            # Volume features
+                s3_hook = S3Hook(aws_conn_id=S3_CONN_ID)
 
-        # Add partition_date                    if 'volume' in ml_features.columns:
+        sentiment_agg = news_df.groupby(['date', 'source']).agg({
 
-        df_features['partition_date'] = date_str                        ml_features['volume_log'] = np.log1p(ml_features['volume'])
+            'sentiment_score': ['mean', 'std', 'count'],            max_active_runs=1Schedule: Daily at 8 AM (weekdays), after Silver layerfrom airflow.operators.python import PythonOperator
 
-                                ml_features['volume_scaled'] = (ml_features['volume'] - ml_features['volume'].mean()) / ml_features['volume'].std()
+            'title': 'count'
 
-        # Write Parquet                    
+        }).reset_index()        # Date range for last 30 days
 
-        parquet_buffer = io.BytesIO()                    # Technical indicators from Silver (if available)
+        
 
-        df_features.to_parquet(                    tech_columns = ['MA_5', 'MA_20', 'RSI', 'MACD', 'BB_position']
+        sentiment_agg.columns = ['date', 'source', 'avg_sentiment', 'sentiment_std', 'sentiment_count', 'news_count']        end_date = execution_date.date())
 
-            parquet_buffer,                    for col in tech_columns:
+        
 
-            engine='pyarrow',                        if col not in ml_features.columns:
+        partition_date_str = end_date.strftime('%Y-%m-%d')        start_date = end_date - timedelta(days=30)
 
-            compression='snappy',                            ml_features[col] = 0  # Default values if not available
+        gold_prefix = f'gold/sentiment_analysis/partition_date={partition_date_str}/'
 
-            index=False                    
+                Dependencies: pandas, pyarrow, numpy
 
-        )                    # Banking sector classification
+        parquet_buffer = BytesIO()
 
-                            big4_banks = ['VCB', 'BID', 'CTG', 'AGR']
+        sentiment_agg.to_parquet(parquet_buffer, engine='pyarrow', compression='snappy', index=False)        logging.info(f"Processing stocks from {start_date} to {end_date}")
 
-        s3_key = f"gold/analytics/market_features/partition_date={date_str}/market_features.parquet"                    tier1_banks = ['VPB', 'TCB', 'MBB', 'STB', 'HDB', 'ACB']
+        parquet_buffer.seek(0)
 
-                            
+                
 
-        s3_hook.load_bytes(                    def classify_bank_tier(symbol):
+        s3_key = f'{gold_prefix}sentiment_agg_{end_date.strftime("%Y%m%d")}.parquet'
 
-            bytes_data=parquet_buffer.getvalue(),                        symbol = str(symbol).upper()
+        s3_hook.load_bytes(parquet_buffer.read(), key=s3_key, bucket_name=S3_BUCKET, replace=True)        # List all stock files in Silver layer
 
-            key=s3_key,                        if symbol in big4_banks:
+        
 
-            bucket_name=bucket_name,                            return 'BIG_4'
+        metadata = {        silver_prefix = 'silver/stocks/'def create_market_features(**context):"""Layer 2 - SENTIMENT_ANALYSIS: Sentiment aggregationsfrom airflow.operators.bash import BashOperator
 
-            replace=True                        elif symbol in tier1_banks:
+            'execution_date': execution_date.isoformat(),
 
-        )                            return 'TIER_1'
+            'date_range': {'start': start_date.isoformat(), 'end': end_date.isoformat()},        all_files = s3_hook.list_keys(bucket_name=S3_BUCKET, prefix=silver_prefix)
 
-                                else:
+            'aggregations': len(sentiment_agg),
 
-        logger.info(f"✅ Uploaded {s3_key}")                            return 'TIER_2'
+            'news_processed': len(news_df),            """Layer 1: Create market_features with technical indicators"""
 
-                            
+            'sources': news_df['source'].unique().tolist() if 'source' in news_df.columns else []
 
-        # Metadata                    symbol_col = 'symbol' if 'symbol' in ml_features.columns else 'ticker'
+        }        if not all_files:
 
-        metadata_summary = {                    ml_features['bank_tier'] = ml_features[symbol_col].apply(classify_bank_tier)
+        
 
-            'processing_date': date_str,                    
+        metadata_key = f'{gold_prefix}_metadata.json'            logging.warning("No Silver stock files found")    try:
 
-            'partition_date': date_str,                    # Select final ML feature columns
+        s3_hook.load_string(json.dumps(metadata, indent=2), key=metadata_key, bucket_name=S3_BUCKET, replace=True)
 
-            'total_symbols': len(df_features),                    feature_columns = ['symbol', 'date', 'close', 'volume', 'bank_tier']
+                    return
 
-            'indicators_calculated': ['MA_5', 'MA_10', 'MA_20', 'MA_30', 'RSI_14', 'volatility_7d'],                    if 'daily_return' in ml_features.columns:
+        log_pipeline_success('gold_layer', 'create_sentiment_analysis', len(sentiment_agg))
 
-            'schema_info': {                        feature_columns.append('daily_return')
+        logging.info(f"Sentiment analysis created: {len(sentiment_agg)} aggregations")                from airflow.providers.amazon.aws.hooks.s3 import S3Hook
 
-                'columns': list(df_features.columns),                    if 'price_change_pct' in ml_features.columns:
+        
 
-                'dtypes': {col: str(dtype) for col, dtype in df_features.dtypes.items()}                        feature_columns.append('price_change_pct')
+    except Exception as e:        # Filter parquet files in date range
 
-            },                    if 'volume_log' in ml_features.columns:
+        log_pipeline_error('gold_layer', 'create_sentiment_analysis', str(e))
 
-            'file_info': {                        feature_columns.append('volume_log')
+        raise        stock_files = [f for f in all_files if f.endswith('.parquet') and 'partition_date=' in f]        from airflow import DAG  - News sentiment by date/sourcefrom airflow.operators.dummy import DummyOperator
 
-                's3_key': s3_key,                    
 
-                'format': 'parquet',                    # Add technical indicators
 
-                'compression': 'snappy'                    feature_columns.extend([col for col in tech_columns if col in ml_features.columns])
+        
 
-            },                    
+def create_serving_cache(**context):
 
-            '_schema_version': '2.0'                    final_ml_features = ml_features[feature_columns].copy()
+    execution_date = context['execution_date']        all_stocks = []        execution_date = context['execution_date']
 
-        }                    
+    log_pipeline_start('gold_layer', 'create_serving_cache', execution_date)
 
-                            # Save ML features to Gold serving
+            
 
-        metadata_key = f"gold/analytics/market_features/partition_date={date_str}/_metadata.json"                    ml_features_csv = final_ml_features.to_csv(index=False)
+    try:
 
-        s3_hook.load_string(                    ml_features_key = f"gold/serving/ml_features/ml_features_{date_str.replace('-', '')}.csv"
+        s3_hook = S3Hook(aws_conn_id=S3_CONN_ID)        # Read stock files        date_str = execution_date.strftime('%Y-%m-%d')from airflow.operators.python import PythonOperator
 
-            string_data=json.dumps(metadata_summary, indent=2),                s3_hook.load_string(
+        end_date = execution_date.date()
 
-            key=metadata_key,                    string_data=ml_features_csv,
+        partition_date_str = end_date.strftime('%Y-%m-%d')        for file_key in stock_files:
 
-            bucket_name=bucket_name,                    key=ml_features_key,
+        
 
-            replace=True                    bucket_name=bucket_name,
+        market_prefix = f'gold/analytics/market_features/partition_date={partition_date_str}/'            try:        
 
-        )                    replace=True
+        market_files = s3_hook.list_keys(bucket_name=S3_BUCKET, prefix=market_prefix)
 
-                        )
+        market_parquet = [f for f in market_files if f.endswith('.parquet')]                # Extract partition date
 
-        result = {                
+        
 
-            'features_created': len(df_features),                results['stock_features_created'] = True
+        if not market_parquet:                partition_str = file_key.split('partition_date=')[1].split('/')[0]        logger = logging.getLogger(__name__)from datetime import datetime, timedeltafrom airflow.providers.amazon.aws.hooks.s3 import S3Hook
 
-            'partition_date': date_str,                logging.info(f"✅ ML features created for {len(stocks_df)} stocks")
+            logging.warning("No market features found")
 
-            'execution_date': date_str                
+            return                partition_date = datetime.strptime(partition_str, '%Y-%m-%d').date()
 
-        }        except Exception as e:
+        
 
-                    logging.error(f"❌ Stock features creation failed: {str(e)}")
+        obj = s3_hook.get_key(market_parquet[0], bucket_name=S3_BUCKET)                        logger.info(f"📊 Creating market features for {date_str}")
 
-        log_pipeline_success(logger, metadata, result)        
+        market_df = pd.read_parquet(BytesIO(obj.get()['Body'].read()))
 
-        logger.info(f"✅ Market Features Complete: {result}")        # 3. Create News Sentiment Analytics aligned with Silver schema
+                        if start_date <= partition_date <= end_date:
 
-                try:
+        latest_data = market_df.sort_values('date').groupby('ticker').last().reset_index()
 
-        return result            news_file_key = f"silver/news/processed/clean_news_{date_str.replace('-', '')}.csv"
+        latest_data['price_change_pct'] = ((latest_data['close'] - latest_data['open']) / latest_data['open'] * 100)                    obj = s3_hook.get_key(file_key, bucket_name=S3_BUCKET)        import logging
+
+        
+
+        top_gainers = latest_data.nlargest(10, 'price_change_pct')[['ticker', 'close', 'price_change_pct', 'volume', 'RSI_14']]                    parquet_data = obj.get()['Body'].read()
+
+        top_losers = latest_data.nsmallest(10, 'price_change_pct')[['ticker', 'close', 'price_change_pct', 'volume', 'RSI_14']]
+
+                            df = pd.read_parquet(BytesIO(parquet_data))        metadata = {
+
+        dashboard_data = {
+
+            'update_time': datetime.now().isoformat(),                    all_stocks.append(df)
+
+            'market_date': end_date.isoformat(),
+
+            'top_gainers': top_gainers.to_dict('records'),            except Exception as e:            'pipeline_name': 'gold_market_features',import jsonLayer 3 - SERVING: Pre-aggregated cache for BI dashboardsfrom airflow.utils.trigger_rule import TriggerRule
+
+            'top_losers': top_losers.to_dict('records'),
+
+            'market_stats': {                logging.error(f"Error reading {file_key}: {e}")
+
+                'total_tickers': len(latest_data),
+
+                'avg_rsi': float(latest_data['RSI_14'].mean()) if 'RSI_14' in latest_data.columns else None,                continue            'layer': 'gold',
+
+                'avg_volatility': float(latest_data['volatility_7d'].mean()) if 'volatility_7d' in latest_data.columns else None
+
+            }        
+
+        }
+
+                if not all_stocks:            'execution_date': date_strimport os
+
+        serving_prefix = f'gold/serving/market_dashboard/partition_date={partition_date_str}/'
+
+        dashboard_key = f'{serving_prefix}dashboard_{end_date.strftime("%Y%m%d")}.json'            logging.warning("No stock data in date range")
+
+        
+
+        s3_hook.load_string(json.dumps(dashboard_data, indent=2, default=str), key=dashboard_key, bucket_name=S3_BUCKET, replace=True)            return        }
+
+        
+
+        log_pipeline_success('gold_layer', 'create_serving_cache', 1)        
+
+        logging.info(f"Serving cache created")
+
+                # Combine all stocks        import pandas as pd  - market_dashboard, sentiment_features, macro_features, risk_metricsfrom airflow.utils.dates import days_ago
+
+    except Exception as e:
+
+        log_pipeline_error('gold_layer', 'create_serving_cache', str(e))        stocks_df = pd.concat(all_stocks, ignore_index=True)
+
+        raise
+
+                log_pipeline_start(logger, metadata)
+
+
+
+def track_pipeline_metadata(**context):        # Calculate technical indicators by ticker
+
+    execution_date = context['execution_date']
+
+    log_pipeline_start('gold_layer', 'track_pipeline_metadata', execution_date)        results = []        import numpy as np
+
+    
+
+    try:        for ticker in stocks_df['ticker'].unique():
+
+        s3_hook = S3Hook(aws_conn_id=S3_CONN_ID)
+
+        end_date = execution_date.date()            ticker_df = stocks_df[stocks_df['ticker'] == ticker].copy()        s3_hook = S3Hook(aws_conn_id='aws_default')
+
+        
+
+        pipeline_metadata = {            ticker_df = calculate_technical_indicators(ticker_df)
+
+            'run_id': context['dag_run'].run_id,
+
+            'execution_date': execution_date.isoformat(),            results.append(ticker_df)        bucket_name = os.getenv('S3_BUCKET', 'bankanalystportfolio')import ioimport logging
+
+            'dag_id': 'gold_layer_pipeline',
+
+            'start_time': datetime.now().isoformat(),        
+
+            'source_layers': ['silver/stocks', 'silver/news'],
+
+            'transformations': ['calculate_technical_indicators', 'aggregate_sentiment', 'create_serving_cache'],        market_features_df = pd.concat(results, ignore_index=True)        
+
+            'gold_outputs': {
+
+                'analytics/market_features': f'partition_date={end_date.strftime("%Y-%m-%d")}',        
+
+                'sentiment_analysis': f'partition_date={end_date.strftime("%Y-%m-%d")}',
+
+                'serving/market_dashboard': f'partition_date={end_date.strftime("%Y-%m-%d")}'        # Write to Gold analytics layer with partitioning        # Read last 30 days for MA calculationfrom enhanced_logger import log_pipeline_start, log_pipeline_success, log_pipeline_error
+
+            }
+
+        }        partition_date_str = end_date.strftime('%Y-%m-%d')
+
+        
+
+        partition_date_str = end_date.strftime('%Y-%m-%d')        gold_prefix = f'gold/analytics/market_features/partition_date={partition_date_str}/'        all_stocks = []
+
+        metadata_prefix = f'gold/metadata/pipeline_runs/partition_date={partition_date_str}/'
+
+        metadata_key = f'{metadata_prefix}run_{context["dag_run"].run_id}.json'        
+
+        
+
+        s3_hook.load_string(json.dumps(pipeline_metadata, indent=2), key=metadata_key, bucket_name=S3_BUCKET, replace=True)        # Save as Parquet        for i in range(30):Layer 4 - METADATA: Pipeline lineage and quality trackingimport os
+
+        
+
+        log_pipeline_success('gold_layer', 'track_pipeline_metadata', 1)        parquet_buffer = BytesIO()
+
+        logging.info(f"Pipeline metadata tracked")
+
+                market_features_df.to_parquet(parquet_buffer, engine='pyarrow', compression='snappy', index=False)            past_date = (execution_date - timedelta(days=i)).strftime('%Y-%m-%d')
+
+    except Exception as e:
+
+        log_pipeline_error('gold_layer', 'track_pipeline_metadata', str(e))        parquet_buffer.seek(0)
+
+        raise
+
+                    stock_key = f"silver/stocks/partition_date={past_date}/stock_data.parquet"# Default arguments
+
+
+
+task_market_features = PythonOperator(        s3_key = f'{gold_prefix}market_features_{end_date.strftime("%Y%m%d")}.parquet'
+
+    task_id='create_market_features',
+
+    python_callable=create_market_features,        s3_hook.load_bytes(            
+
+    dag=dag
+
+)            parquet_buffer.read(),
+
+
+
+task_sentiment_analysis = PythonOperator(            key=s3_key,            try:default_args = {  - pipeline_runs: Execution tracking with lineageimport json
+
+    task_id='create_sentiment_analysis',
+
+    python_callable=create_sentiment_analysis,            bucket_name=S3_BUCKET,
+
+    dag=dag
+
+)            replace=True                obj = s3_hook.get_conn().get_object(Bucket=bucket_name, Key=stock_key)
+
+
+
+task_serving_cache = PythonOperator(        )
+
+    task_id='create_serving_cache',
+
+    python_callable=create_serving_cache,                        df_day = pd.read_parquet(io.BytesIO(obj['Body'].read()))    'owner': 'finance_portfolio',
+
+    dag=dag
+
+)        # Save metadata
+
+
+
+task_pipeline_metadata = PythonOperator(        metadata = {                all_stocks.append(df_day)
+
+    task_id='track_pipeline_metadata',
+
+    python_callable=track_pipeline_metadata,            'execution_date': execution_date.isoformat(),
+
+    dag=dag
+
+)            'date_range': {'start': start_date.isoformat(), 'end': end_date.isoformat()},            except:    'depends_on_past': False,  - quality_metrics: Data quality per tableimport pandas as pd
+
+
+
+[task_market_features, task_sentiment_analysis] >> task_serving_cache >> task_pipeline_metadata            'records_processed': len(market_features_df),
+
+
+            'tickers_count': market_features_df['ticker'].nunique(),                continue
+
+            'features': ['MA_5', 'MA_10', 'MA_20', 'MA_30', 'RSI_14', 'volatility_7d']
+
+        }            'start_date': datetime(2024, 1, 1),
+
+        
+
+        metadata_key = f'{gold_prefix}_metadata.json'        if not all_stocks:
+
+        s3_hook.load_string(
+
+            json.dumps(metadata, indent=2),            logger.warning(f"⚠️ No stock data found")    'email_on_failure': True,import numpy as np
+
+            key=metadata_key,
+
+            bucket_name=S3_BUCKET,            return {'features_created': 0}
+
+            replace=True
+
+        )            'email_on_retry': False,
+
+        
+
+        log_pipeline_success('gold_layer', 'create_market_features', len(market_features_df))        df = pd.concat(all_stocks, ignore_index=True)
+
+        logging.info(f"Market features created: {len(market_features_df)} records, {market_features_df['ticker'].nunique()} tickers")
+
+                df['data_date'] = pd.to_datetime(df['data_date'])    'retries': 3,Schedule: Daily at 8 AM (weekdays), after Silver layer
+
+    except Exception as e:
+
+        log_pipeline_error('gold_layer', 'create_market_features', str(e))        df = df.sort_values(['symbol', 'data_date'])
+
+        raise
+
+            'retry_delay': timedelta(minutes=5),
+
+
+
+def create_sentiment_analysis(**context):        logger.info(f"📝 Processing {df['symbol'].nunique()} symbols")
+
+    """
+
+    Layer 2 - SENTIMENT_ANALYSIS: News Sentiment Aggregation            'execution_timeout': timedelta(hours=4),Dependencies: pandas, pyarrow, numpy# Import custom utilities
+
+    Aggregate Silver news sentiment by date and source
+
+    """        # Calculate indicators per symbol
+
+    execution_date = context['execution_date']
+
+    log_pipeline_start('gold_layer', 'create_sentiment_analysis', execution_date)        features = []}
+
+    
+
+    try:        for symbol in df['symbol'].unique():
+
+        s3_hook = S3Hook(aws_conn_id=S3_CONN_ID)
+
+                    df_symbol = df[df['symbol'] == symbol].copy().sort_values('data_date')"""import sys
+
+        # Date range for last 7 days
+
+        end_date = execution_date.date()            
+
+        start_date = end_date - timedelta(days=7)
+
+                    if date_str not in df_symbol['data_date'].astype(str).values:# DAG definition
+
+        logging.info(f"Processing news from {start_date} to {end_date}")
+
+                        continue
+
+        # List news files in Silver layer
+
+        silver_prefix = 'silver/news/'            dag = DAG(sys.path.append('/opt/airflow/plugins')
+
+        all_files = s3_hook.list_keys(bucket_name=S3_BUCKET, prefix=silver_prefix)
+
+                    # Moving Averages
+
+        if not all_files:
+
+            logging.warning("No Silver news files found")            df_symbol['MA_5'] = df_symbol['close'].rolling(5, min_periods=1).mean()    'gold_layer_pipeline',
+
+            return
+
+                    df_symbol['MA_10'] = df_symbol['close'].rolling(10, min_periods=1).mean()
+
+        # Filter parquet files
+
+        news_files = [f for f in all_files if f.endswith('.parquet') and 'partition_date=' in f]            df_symbol['MA_20'] = df_symbol['close'].rolling(20, min_periods=1).mean()    default_args=default_args,from airflow import DAGsys.path.append('/opt/airflow/utils')
+
+        
+
+        all_news = []            df_symbol['MA_30'] = df_symbol['close'].rolling(30, min_periods=1).mean()
+
+        
+
+        # Read news files                description='Gold layer analytics (4-layer architecture: analytics/sentiment/serving/metadata)',
+
+        for file_key in news_files:
+
+            try:            # RSI
+
+                partition_str = file_key.split('partition_date=')[1].split('/')[0]
+
+                partition_date = datetime.strptime(partition_str, '%Y-%m-%d').date()            delta = df_symbol['close'].diff()    schedule_interval='0 8 * * 1-5',  # 8 AM weekdaysfrom airflow.operators.python import PythonOperator# Temporarily comment out Spark imports for testing
+
+                
+
+                if start_date <= partition_date <= end_date:            gain = delta.where(delta > 0, 0).rolling(14, min_periods=1).mean()
+
+                    obj = s3_hook.get_key(file_key, bucket_name=S3_BUCKET)
+
+                    parquet_data = obj.get()['Body'].read()            loss = (-delta.where(delta < 0, 0)).rolling(14, min_periods=1).mean()    catchup=False,
+
+                    df = pd.read_parquet(BytesIO(parquet_data))
+
+                    all_news.append(df)            rs = gain / loss
+
+            except Exception as e:
+
+                logging.error(f"Error reading {file_key}: {e}")            df_symbol['RSI_14'] = 100 - (100 / (1 + rs))    tags=['gold', 'lakehouse', 'analytics'],from datetime import datetime, timedelta# from spark_utils import get_spark_manager, get_financial_processor, with_spark_session
+
+                continue
 
                     
 
-    except Exception as e:            # Try alternative date format
+        if not all_news:
 
-        context_data = {            if not s3_hook.check_for_key(key=news_file_key, bucket_name=bucket_name):
+            logging.warning("No news data in date range")            # Volatility    max_active_runs=1
 
-            'features_created': len(df_features) if 'df_features' in locals() else 0                alt_news_key = f"silver/news/processed/clean_news_{date_str}.csv"
+            return
 
-        }                if s3_hook.check_for_key(key=alt_news_key, bucket_name=bucket_name):
+                    df_symbol['volatility_7d'] = df_symbol['close'].rolling(7, min_periods=1).std()
 
-                            news_file_key = alt_news_key
+        # Combine all news
 
-        log_pipeline_error(logger, metadata, e, context_data)            
+        news_df = pd.concat(all_news, ignore_index=True)            )import logging
 
-        raise            if s3_hook.check_for_key(key=news_file_key, bucket_name=bucket_name):
+        
 
-                # Read silver news data
+        # Ensure date column exists            today = df_symbol[df_symbol['data_date'].astype(str) == date_str].iloc[-1]
 
-                csv_content = s3_hook.read_key(key=news_file_key, bucket_name=bucket_name)
+        if 'published_date' in news_df.columns:
 
-def create_sentiment_analysis(**context):                news_df = pd.read_csv(pd.StringIO(csv_content))
+            news_df['date'] = pd.to_datetime(news_df['published_date']).dt.date            
 
-    """                
+        
 
-    Layer 2 - SENTIMENT_ANALYSIS: Aggregate news sentiment by date/source                logging.info(f"📰 Processing {len(news_df)} news articles for sentiment analytics")
+        # Aggregate by date and source            features.append({
+
+        sentiment_agg = news_df.groupby(['date', 'source']).agg({
+
+            'sentiment_score': ['mean', 'std', 'count'],                'symbol': symbol,import json# Import enhanced logging
+
+            'title': 'count'
+
+        }).reset_index()                'data_date': date_str,
+
+        
+
+        sentiment_agg.columns = ['date', 'source', 'avg_sentiment', 'sentiment_std', 'sentiment_count', 'news_count']                'close': today['close'],def create_market_features(**context):
+
+        
+
+        # Write to Gold sentiment_analysis layer                'volume': today['volume'],
+
+        partition_date_str = end_date.strftime('%Y-%m-%d')
+
+        gold_prefix = f'gold/sentiment_analysis/partition_date={partition_date_str}/'                'MA_5': round(today['MA_5'], 2) if pd.notna(today['MA_5']) else None,    """import osfrom enhanced_logger import get_enhanced_logger, log_pipeline_start, log_pipeline_success, log_pipeline_error
+
+        
+
+        parquet_buffer = BytesIO()                'MA_10': round(today['MA_10'], 2) if pd.notna(today['MA_10']) else None,
+
+        sentiment_agg.to_parquet(parquet_buffer, engine='pyarrow', compression='snappy', index=False)
+
+        parquet_buffer.seek(0)                'MA_20': round(today['MA_20'], 2) if pd.notna(today['MA_20']) else None,    Layer 1 - ANALYTICS: Create market_features table with technical indicators
+
+        
+
+        s3_key = f'{gold_prefix}sentiment_agg_{end_date.strftime("%Y%m%d")}.parquet'                'MA_30': round(today['MA_30'], 2) if pd.notna(today['MA_30']) else None,
+
+        s3_hook.load_bytes(
+
+            parquet_buffer.read(),                'RSI_14': round(today['RSI_14'], 2) if pd.notna(today['RSI_14']) else None,    Input: silver/stocks/partition_date=*/stock_data.parquetimport pandas as pd
+
+            key=s3_key,
+
+            bucket_name=S3_BUCKET,                'volatility_7d': round(today['volatility_7d'], 2) if pd.notna(today['volatility_7d']) else None,
+
+            replace=True
+
+        )                'partition_date': date_str    Output: gold/analytics/market_features/partition_date=YYYY-MM-DD/*.parquet
+
+        
+
+        # Metadata            })
+
+        metadata = {
+
+            'execution_date': execution_date.isoformat(),            """import numpy as np# Default args
+
+            'date_range': {'start': start_date.isoformat(), 'end': end_date.isoformat()},
+
+            'aggregations': len(sentiment_agg),        df_features = pd.DataFrame(features)
+
+            'news_processed': len(news_df),
+
+            'sources': news_df['source'].unique().tolist() if 'source' in news_df.columns else []        logger.info(f"✅ Created {len(df_features)} features")    try:
+
+        }
+
+                
+
+        metadata_key = f'{gold_prefix}_metadata.json'
+
+        s3_hook.load_string(        # Write Parquet        from airflow.providers.amazon.aws.hooks.s3 import S3Hookimport pyarrow as padefault_args = {
+
+            json.dumps(metadata, indent=2),
+
+            key=metadata_key,        buffer = io.BytesIO()
+
+            bucket_name=S3_BUCKET,
+
+            replace=True        df_features.to_parquet(buffer, engine='pyarrow', compression='snappy', index=False)        
+
+        )
+
+                
+
+        log_pipeline_success('gold_layer', 'create_sentiment_analysis', len(sentiment_agg))
+
+        logging.info(f"Sentiment analysis created: {len(sentiment_agg)} aggregations from {len(news_df)} news")        s3_key = f"gold/analytics/market_features/partition_date={date_str}/features.parquet"        execution_date = context['execution_date']import pyarrow.parquet as pq    'owner': 'banking-portfolio',
+
+        
+
+    except Exception as e:        s3_hook.load_bytes(buffer.getvalue(), s3_key, bucket_name, replace=True)
+
+        log_pipeline_error('gold_layer', 'create_sentiment_analysis', str(e))
+
+        raise                date_str = execution_date.strftime('%Y-%m-%d')
+
+
+
+        logger.info(f"✅ Uploaded {s3_key}")
+
+def create_serving_cache(**context):
+
+    """                import io    'depends_on_past': False,
+
+    Layer 3 - SERVING: Pre-aggregated BI Cache
+
+    Create serving datasets for dashboards and BI tools        result = {'features_created': len(df_features)}
+
+    """
+
+    execution_date = context['execution_date']        log_pipeline_success(logger, metadata, result)        logger = logging.getLogger(__name__)
+
+    log_pipeline_start('gold_layer', 'create_serving_cache', execution_date)
+
+            return result
+
+    try:
+
+        s3_hook = S3Hook(aws_conn_id=S3_CONN_ID)                logger.info(f"📊 Creating market features for {date_str}")from enhanced_logger import log_pipeline_start, log_pipeline_success, log_pipeline_error    'start_date': datetime(2025, 10, 16),
+
+        end_date = execution_date.date()
+
+        partition_date_str = end_date.strftime('%Y-%m-%d')    except Exception as e:
+
+        
+
+        # Read latest market features        log_pipeline_error(logger, metadata, e, {})        
+
+        market_prefix = f'gold/analytics/market_features/partition_date={partition_date_str}/'
+
+        market_files = s3_hook.list_keys(bucket_name=S3_BUCKET, prefix=market_prefix)        raise
+
+        market_parquet = [f for f in market_files if f.endswith('.parquet')]
+
+                metadata = {    'email_on_failure': False,
+
+        if not market_parquet:
+
+            logging.warning("No market features found for serving cache")
+
+            return
+
+        def create_sentiment_analysis(**context):            'pipeline_name': 'gold_market_features',
+
+        # Read market features
+
+        obj = s3_hook.get_key(market_parquet[0], bucket_name=S3_BUCKET)    """Layer 2: Aggregate news sentiment"""
+
+        market_df = pd.read_parquet(BytesIO(obj.get()['Body'].read()))
+
+            try:            'layer': 'gold',# Default arguments    'email_on_retry': False,
+
+        # Create market dashboard cache (top gainers/losers)
+
+        latest_data = market_df.sort_values('date').groupby('ticker').last().reset_index()        from airflow.providers.amazon.aws.hooks.s3 import S3Hook
+
+        latest_data['price_change_pct'] = ((latest_data['close'] - latest_data['open']) / latest_data['open'] * 100)
+
+                            'data_type': 'analytics',
+
+        # Top 10 gainers
+
+        top_gainers = latest_data.nlargest(10, 'price_change_pct')[['ticker', 'close', 'price_change_pct', 'volume', 'RSI_14']]        execution_date = context['execution_date']
+
+        
+
+        # Top 10 losers        date_str = execution_date.strftime('%Y-%m-%d')            'execution_date': date_strdefault_args = {    'retries': int(os.getenv('MAX_RETRY_ATTEMPTS', 2)),
+
+        top_losers = latest_data.nsmallest(10, 'price_change_pct')[['ticker', 'close', 'price_change_pct', 'volume', 'RSI_14']]
+
+                
+
+        # Market dashboard
+
+        dashboard_data = {        logger = logging.getLogger(__name__)        }
+
+            'update_time': datetime.now().isoformat(),
+
+            'market_date': end_date.isoformat(),        logger.info(f"📰 Creating sentiment analysis for {date_str}")
+
+            'top_gainers': top_gainers.to_dict('records'),
+
+            'top_losers': top_losers.to_dict('records'),                    'owner': 'finance_portfolio',    'retry_delay': timedelta(minutes=5),
+
+            'market_stats': {
+
+                'total_tickers': len(latest_data),        metadata = {
+
+                'avg_rsi': float(latest_data['RSI_14'].mean()) if 'RSI_14' in latest_data.columns else None,
+
+                'avg_volatility': float(latest_data['volatility_7d'].mean()) if 'volatility_7d' in latest_data.columns else None            'pipeline_name': 'gold_sentiment_analysis',        log_pipeline_start(logger, metadata)
+
+            }
+
+        }            'layer': 'gold',
+
+        
+
+        # Write serving cache            'execution_date': date_str            'depends_on_past': False,    'execution_timeout': timedelta(hours=2),
+
+        serving_prefix = f'gold/serving/market_dashboard/partition_date={partition_date_str}/'
+
+        dashboard_key = f'{serving_prefix}dashboard_{end_date.strftime("%Y%m%d")}.json'        }
+
+        
+
+        s3_hook.load_string(                # Initialize S3
+
+            json.dumps(dashboard_data, indent=2, default=str),
+
+            key=dashboard_key,        log_pipeline_start(logger, metadata)
+
+            bucket_name=S3_BUCKET,
+
+            replace=True                s3_hook = S3Hook(aws_conn_id='aws_default')    'start_date': datetime(2024, 1, 1),}
+
+        )
+
+                s3_hook = S3Hook(aws_conn_id='aws_default')
+
+        log_pipeline_success('gold_layer', 'create_serving_cache', 1)
+
+        logging.info(f"Serving cache created: market_dashboard with {len(top_gainers)} gainers, {len(top_losers)} losers")        bucket_name = os.getenv('S3_BUCKET', 'bankanalystportfolio')        bucket_name = os.getenv('S3_BUCKET', 'bankanalystportfolio')
+
+        
+
+    except Exception as e:        
+
+        log_pipeline_error('gold_layer', 'create_serving_cache', str(e))
+
+        raise        news_key = f"silver/news/partition_date={date_str}/news_cleaned.parquet"            'email_on_failure': True,
+
+
+
+        
+
+def track_pipeline_metadata(**context):
+
+    """        try:        # Read Silver stocks data (last 30 days for MA calculation)
+
+    Layer 4 - METADATA: Pipeline Lineage Tracking
+
+    Track pipeline execution metadata and lineage            obj = s3_hook.get_conn().get_object(Bucket=bucket_name, Key=news_key)
+
+    """
+
+    execution_date = context['execution_date']            df_news = pd.read_parquet(io.BytesIO(obj['Body'].read()))        logger.info(f"📂 Reading Silver stocks data...")    'email_on_retry': False,# DAG definition
+
+    log_pipeline_start('gold_layer', 'track_pipeline_metadata', execution_date)
+
+            except:
+
+    try:
+
+        s3_hook = S3Hook(aws_conn_id=S3_CONN_ID)            logger.warning(f"⚠️ No news data")        
+
+        end_date = execution_date.date()
+
+                    return {'sentiment_records': 0}
+
+        # Create pipeline run metadata
+
+        pipeline_metadata = {                # Get last 30 days of data for moving averages    'retries': 3,dag = DAG(
+
+            'run_id': context['dag_run'].run_id,
+
+            'execution_date': execution_date.isoformat(),        logger.info(f"📝 Processing {len(df_news)} news articles")
+
+            'dag_id': 'gold_layer_pipeline',
+
+            'start_time': datetime.now().isoformat(),                all_stocks = []
+
+            'source_layers': ['silver/stocks', 'silver/news'],
+
+            'transformations': [        # Simple sentiment
+
+                'calculate_technical_indicators',
+
+                'aggregate_sentiment',        def calc_sentiment(text):        for i in range(30):    'retry_delay': timedelta(minutes=5),    'gold_layer_pipeline',
+
+                'create_serving_cache'
+
+            ],            text_lower = str(text).lower()
+
+            'gold_outputs': {
+
+                'analytics/market_features': f'partition_date={end_date.strftime("%Y-%m-%d")}',            pos = sum(1 for w in ['tăng', 'tốt', 'lợi nhuận'] if w in text_lower)            past_date = (execution_date - timedelta(days=i)).strftime('%Y-%m-%d')
+
+                'sentiment_analysis': f'partition_date={end_date.strftime("%Y-%m-%d")}',
+
+                'serving/market_dashboard': f'partition_date={end_date.strftime("%Y-%m-%d")}'            neg = sum(1 for w in ['giảm', 'xấu', 'lỗ'] if w in text_lower)
+
+            }
+
+        }                        stock_key = f"silver/stocks/partition_date={past_date}/stock_data.parquet"    'execution_timeout': timedelta(hours=4),    default_args=default_args,
+
+        
+
+        # Write metadata            if pos > neg:
+
+        partition_date_str = end_date.strftime('%Y-%m-%d')
+
+        metadata_prefix = f'gold/metadata/pipeline_runs/partition_date={partition_date_str}/'                return 1.0, 'positive'            
+
+        metadata_key = f'{metadata_prefix}run_{context["dag_run"].run_id}.json'
+
+                    elif neg > pos:
+
+        s3_hook.load_string(
+
+            json.dumps(pipeline_metadata, indent=2),                return -1.0, 'negative'            try:}    description='Gold Layer - Analytics & ML Feature Engineering with Spark',
+
+            key=metadata_key,
+
+            bucket_name=S3_BUCKET,            return 0.0, 'neutral'
+
+            replace=True
+
+        )                        obj = s3_hook.get_conn().get_object(Bucket=bucket_name, Key=stock_key)
+
+        
+
+        log_pipeline_success('gold_layer', 'track_pipeline_metadata', 1)        df_news[['sentiment_score', 'sentiment_label']] = df_news['content'].apply(
+
+        logging.info(f"Pipeline metadata tracked: {metadata_key}")
+
+                    lambda x: pd.Series(calc_sentiment(x))                df_day = pd.read_parquet(io.BytesIO(obj['Body'].read()))    schedule_interval='0 8 * * 1-5',  # 8:00 AM weekdays (after Silver DAG)
+
+    except Exception as e:
+
+        log_pipeline_error('gold_layer', 'track_pipeline_metadata', str(e))        )
+
+        raise
+
+                        all_stocks.append(df_day)
+
+
+
+# Define tasks        # Aggregate
+
+task_market_features = PythonOperator(
+
+    task_id='create_market_features',        agg = df_news.groupby(['data_date', 'source']).agg({            except:# DAG definition    catchup=False,
+
+    python_callable=create_market_features,
+
+    dag=dag            'id': 'count',
+
+)
+
+            'sentiment_score': 'mean'                continue
+
+task_sentiment_analysis = PythonOperator(
+
+    task_id='create_sentiment_analysis',        }).reset_index()
+
+    python_callable=create_sentiment_analysis,
+
+    dag=dag                dag = DAG(    max_active_runs=1,
+
+)
+
+        agg.columns = ['data_date', 'source', 'article_count', 'avg_sentiment']
+
+task_serving_cache = PythonOperator(
+
+    task_id='create_serving_cache',        agg['partition_date'] = date_str        if not all_stocks:
+
+    python_callable=create_serving_cache,
+
+    dag=dag        
+
+)
+
+        logger.info(f"✅ Created {len(agg)} sentiment records")            logger.warning(f"⚠️ No stock data found for MA calculation")    'gold_layer_pipeline',    max_active_tasks=8,
+
+task_pipeline_metadata = PythonOperator(
+
+    task_id='track_pipeline_metadata',        
+
+    python_callable=track_pipeline_metadata,
+
+    dag=dag        # Write            result = {'features_created': 0, 'execution_date': date_str}
+
+)
+
+        buffer = io.BytesIO()
+
+# Task dependencies
+
+# Market features and sentiment can run in parallel        agg.to_parquet(buffer, engine='pyarrow', compression='snappy', index=False)            log_pipeline_success(logger, metadata, result)    default_args=default_args,    tags=['gold', 'analytics', 'spark', 'ml-features'],
+
+# Serving cache depends on market features
+
+# Metadata tracking runs last        
+
+[task_market_features, task_sentiment_analysis] >> task_serving_cache >> task_pipeline_metadata
+
+        s3_key = f"gold/sentiment_analysis/partition_date={date_str}/sentiment.parquet"            return result
+
+        s3_hook.load_bytes(buffer.getvalue(), s3_key, bucket_name, replace=True)
+
+                    description='Gold layer analytics (4-layer architecture: analytics/sentiment/serving/metadata)',)
+
+        logger.info(f"✅ Uploaded {s3_key}")
+
+                df = pd.concat(all_stocks, ignore_index=True)
+
+        result = {'sentiment_records': len(agg)}
+
+        log_pipeline_success(logger, metadata, result)        df['data_date'] = pd.to_datetime(df['data_date'])    schedule_interval='0 8 * * 1-5',  # 8 AM weekdays
+
+        return result
+
+                df = df.sort_values(['symbol', 'data_date'])
+
+    except Exception as e:
+
+        log_pipeline_error(logger, metadata, e, {})            catchup=False,def create_analytics_tables(**context):
+
+        raise
+
+        logger.info(f"📝 Loaded {len(df)} stock records for {df['symbol'].nunique()} symbols")
+
+
+
+def create_serving_cache(**context):            tags=['gold', 'lakehouse', 'analytics'],    """Create business intelligence tables based on gold_layer_etl.py logic"""
+
+    """Layer 3: Create BI cache"""
+
+    try:        # Calculate technical indicators per symbol
+
+        from airflow.providers.amazon.aws.hooks.s3 import S3Hook
+
+                logger.info(f"📈 Calculating technical indicators...")    max_active_runs=1    # Initialize enhanced logger
+
+        execution_date = context['execution_date']
+
+        date_str = execution_date.strftime('%Y-%m-%d')        
+
+        
+
+        logger = logging.getLogger(__name__)        features = [])    logger = get_enhanced_logger("gold_analytics_creation", "INFO")
+
+        logger.info(f"🎯 Creating serving cache for {date_str}")
+
+                
+
+        metadata = {
+
+            'pipeline_name': 'gold_serving_cache',        for symbol in df['symbol'].unique():    
+
+            'layer': 'gold',
+
+            'execution_date': date_str            df_symbol = df[df['symbol'] == symbol].copy()
+
+        }
+
+                    df_symbol = df_symbol.sort_values('data_date')    # Start pipeline operation tracking
+
+        log_pipeline_start(logger, metadata)
+
+                    
+
+        s3_hook = S3Hook(aws_conn_id='aws_default')
+
+        bucket_name = os.getenv('S3_BUCKET', 'bankanalystportfolio')            # Only process if we have today's datadef create_market_features(**context):    metadata = log_pipeline_start(
+
+        
+
+        # Read market features            if date_str not in df_symbol['data_date'].astype(str).values:
+
+        try:
+
+            market_key = f"gold/analytics/market_features/partition_date={date_str}/features.parquet"                continue    """        logger,
+
+            obj = s3_hook.get_conn().get_object(Bucket=bucket_name, Key=market_key)
+
+            df_market = pd.read_parquet(io.BytesIO(obj['Body'].read()))            
+
+        except:
+
+            df_market = pd.DataFrame()            # Moving Averages    Layer 1 - ANALYTICS: Create market_features table with technical indicators        pipeline_name="gold_analytics_creation",
+
+        
+
+        if not df_market.empty:            df_symbol['MA_5'] = df_symbol['close'].rolling(window=5, min_periods=1).mean()
+
+            # Create dashboard
+
+            dashboard = pd.DataFrame({            df_symbol['MA_10'] = df_symbol['close'].rolling(window=10, min_periods=1).mean()    Input: silver/stocks/partition_date=*/stock_data.parquet        layer="gold",
+
+                'data_date': [date_str],
+
+                'total_symbols': [len(df_market)],            df_symbol['MA_20'] = df_symbol['close'].rolling(window=20, min_periods=1).mean()
+
+                'avg_rsi': [df_market['RSI_14'].mean()],
+
+                'avg_volatility': [df_market['volatility_7d'].mean()],            df_symbol['MA_30'] = df_symbol['close'].rolling(window=30, min_periods=1).mean()    Output: gold/analytics/market_features/partition_date=YYYY-MM-DD/*.parquet        operation="create_business_intelligence",
+
+                'partition_date': [date_str]
+
+            })            
+
+            
+
+            buffer = io.BytesIO()            # RSI (14-day)    """        dag_run_id=context.get('dag_run').run_id,
+
+            dashboard.to_parquet(buffer, engine='pyarrow', compression='snappy', index=False)
+
+                        delta = df_symbol['close'].diff()
+
+            s3_key = f"gold/serving/market_dashboard/partition_date={date_str}/dashboard.parquet"
+
+            s3_hook.load_bytes(buffer.getvalue(), s3_key, bucket_name, replace=True)            gain = (delta.where(delta > 0, 0)).rolling(window=14, min_periods=1).mean()    try:        task_id=context.get('task_instance').task_id
+
+            
+
+            logger.info(f"✅ Created market dashboard: {s3_key}")            loss = (-delta.where(delta < 0, 0)).rolling(window=14, min_periods=1).mean()
+
+        
+
+        result = {'cache_created': not df_market.empty}            rs = gain / loss        from airflow.providers.amazon.aws.hooks.s3 import S3Hook    )
+
+        log_pipeline_success(logger, metadata, result)
+
+        return result            df_symbol['RSI_14'] = 100 - (100 / (1 + rs))
+
+        
+
+    except Exception as e:                        
+
+        log_pipeline_error(logger, metadata, e, {})
+
+        raise            # Volatility (7-day standard deviation)
+
+
+
+            df_symbol['volatility_7d'] = df_symbol['close'].rolling(window=7, min_periods=1).std()        execution_date = context['execution_date']    try:
+
+def track_pipeline_metadata(**context):
+
+    """Layer 4: Track pipeline metadata"""            
+
+    try:
+
+        from airflow.providers.amazon.aws.hooks.s3 import S3Hook            # Get today's row        date_str = execution_date.strftime('%Y-%m-%d')        execution_date = context['execution_date']
+
+        
+
+        execution_date = context['execution_date']            today_row = df_symbol[df_symbol['data_date'].astype(str) == date_str].iloc[-1]
+
+        date_str = execution_date.strftime('%Y-%m-%d')
+
+                                    date_str = execution_date.strftime('%Y-%m-%d')
+
+        logger = logging.getLogger(__name__)
+
+        logger.info(f"📊 Tracking metadata for {date_str}")            feature_record = {
+
+        
+
+        s3_hook = S3Hook(aws_conn_id='aws_default')                'symbol': symbol,        logger = logging.getLogger(__name__)        
+
+        bucket_name = os.getenv('S3_BUCKET', 'bankanalystportfolio')
+
+                        'data_date': date_str,
+
+        ti = context['task_instance']
+
+        market_result = ti.xcom_pull(task_ids='create_market_features')                'close': today_row['close'],        logger.info(f"📊 Creating market features for {date_str}")        logger.log_progress(metadata, f"Starting analytics tables creation for {date_str}")
+
+        sentiment_result = ti.xcom_pull(task_ids='create_sentiment_analysis')
+
+                        'volume': today_row['volume'],
+
+        metadata_record = {
+
+            'run_id': context['dag_run'].run_id,                'MA_5': round(today_row['MA_5'], 2) if pd.notna(today_row['MA_5']) else None,                
+
+            'execution_date': date_str,
+
+            'dag_id': 'gold_layer_pipeline',                'MA_10': round(today_row['MA_10'], 2) if pd.notna(today_row['MA_10']) else None,
+
+            'layers': {
+
+                'analytics': market_result,                'MA_20': round(today_row['MA_20'], 2) if pd.notna(today_row['MA_20']) else None,        metadata = {        from airflow.providers.amazon.aws.hooks.s3 import S3Hook
+
+                'sentiment_analysis': sentiment_result
+
+            },                'MA_30': round(today_row['MA_30'], 2) if pd.notna(today_row['MA_30']) else None,
+
+            'status': 'SUCCESS',
+
+            'partition_date': date_str                'RSI_14': round(today_row['RSI_14'], 2) if pd.notna(today_row['RSI_14']) else None,            'pipeline_name': 'gold_market_features',        import pandas as pd
+
+        }
+
+                        'volatility_7d': round(today_row['volatility_7d'], 2) if pd.notna(today_row['volatility_7d']) else None,
+
+        df = pd.DataFrame([metadata_record])
+
+                        'price_change': today_row.get('price_change', 0),            'layer': 'gold',        import json
+
+        buffer = io.BytesIO()
+
+        df.to_parquet(buffer, engine='pyarrow', compression='snappy', index=False)                'price_change_pct': today_row.get('price_change_pct', 0)
+
+        
+
+        s3_key = f"gold/metadata/pipeline_runs/partition_date={date_str}/metadata.parquet"            }            'data_type': 'analytics',        
+
+        s3_hook.load_bytes(buffer.getvalue(), s3_key, bucket_name, replace=True)
+
+                    
+
+        logger.info(f"✅ Metadata tracked: {s3_key}")
+
+                    features.append(feature_record)            'execution_date': date_str        # Initialize S3
+
+        return {'metadata_tracked': True}
+
+                
+
+    except Exception as e:
+
+        logger.error(f"💥 Metadata tracking failed: {str(e)}")        df_features = pd.DataFrame(features)        }        s3_hook = S3Hook(aws_conn_id='aws_default')
+
+        raise
+
+        
+
+
+
+# Task definitions        logger.info(f"✅ Created features for {len(df_features)} symbols")                bucket_name = os.getenv('S3_BUCKET', 'bankanalystportfolio')
+
+create_market_features_task = PythonOperator(
+
+    task_id='create_market_features',        
+
+    python_callable=create_market_features,
+
+    dag=dag,        # Add partition_date        log_pipeline_start(logger, metadata)        
+
+)
+
+        df_features['partition_date'] = date_str
+
+create_sentiment_task = PythonOperator(
+
+    task_id='create_sentiment_analysis',                        results = {
+
+    python_callable=create_sentiment_analysis,
+
+    dag=dag,        # Write Parquet
+
+)
+
+        parquet_buffer = io.BytesIO()        # Initialize S3            'market_summary_created': False,
+
+create_serving_task = PythonOperator(
+
+    task_id='create_serving_cache',        df_features.to_parquet(
+
+    python_callable=create_serving_cache,
+
+    dag=dag,            parquet_buffer,        s3_hook = S3Hook(aws_conn_id='aws_default')            'stock_features_created': False,
+
+)
+
+            engine='pyarrow',
+
+track_metadata_task = PythonOperator(
+
+    task_id='track_pipeline_metadata',            compression='snappy',        bucket_name = os.getenv('S3_BUCKET', 'bankanalystportfolio')            'news_sentiment_created': False,
+
+    python_callable=track_pipeline_metadata,
+
+    dag=dag,            index=False
+
+)
+
+        )                    'execution_date': date_str
+
+# Dependencies: Layer 1&2 → Layer 3 → Layer 4
+
+[create_market_features_task, create_sentiment_task] >> create_serving_task >> track_metadata_task        
+
+
+        s3_key = f"gold/analytics/market_features/partition_date={date_str}/market_features.parquet"        # Read Silver stocks data (last 30 days for MA calculation)        }
+
+        
+
+        s3_hook.load_bytes(        logger.info(f"📂 Reading Silver stocks data...")        
+
+            bytes_data=parquet_buffer.getvalue(),
+
+            key=s3_key,                s3_paths = []
+
+            bucket_name=bucket_name,
+
+            replace=True        # Get last 30 days of data for moving averages        processed_records = 0
+
+        )
+
+                all_stocks = []        
+
+        logger.info(f"✅ Uploaded {s3_key}")
+
+                for i in range(30):        # 1. Create Market Summary from Silver stocks data
+
+        # Metadata
+
+        metadata_summary = {            past_date = (execution_date - timedelta(days=i)).strftime('%Y-%m-%d')        try:
+
+            'processing_date': date_str,
+
+            'partition_date': date_str,            stock_key = f"silver/stocks/partition_date={past_date}/stock_data.parquet"            logger.log_progress(metadata, "Creating market summary from silver stocks data")
+
+            'total_symbols': len(df_features),
+
+            'indicators_calculated': ['MA_5', 'MA_10', 'MA_20', 'MA_30', 'RSI_14', 'volatility_7d'],                        
+
+            'schema_info': {
+
+                'columns': list(df_features.columns),            try:            # Read processed stock data from Silver layer - aligned with actual structure
+
+                'dtypes': {col: str(dtype) for col, dtype in df_features.dtypes.items()}
+
+            },                obj = s3_hook.get_conn().get_object(Bucket=bucket_name, Key=stock_key)            stock_file_key = f"silver/stocks/processed/clean_stocks_{date_str.replace('-', '')}.csv"
+
+            'file_info': {
+
+                's3_key': s3_key,                df_day = pd.read_parquet(io.BytesIO(obj['Body'].read()))            
+
+                'format': 'parquet',
+
+                'compression': 'snappy'                all_stocks.append(df_day)            if not s3_hook.check_for_key(key=stock_file_key, bucket_name=bucket_name):
+
+            },
+
+            '_schema_version': '2.0'            except:                # Try alternative date format
+
+        }
+
+                        continue                alt_stock_key = f"silver/stocks/processed/clean_stocks_{date_str}.csv"
+
+        metadata_key = f"gold/analytics/market_features/partition_date={date_str}/_metadata.json"
+
+        s3_hook.load_string(                        if s3_hook.check_for_key(key=alt_stock_key, bucket_name=bucket_name):
+
+            string_data=json.dumps(metadata_summary, indent=2),
+
+            key=metadata_key,        if not all_stocks:                    stock_file_key = alt_stock_key
+
+            bucket_name=bucket_name,
+
+            replace=True            logger.warning(f"⚠️ No stock data found for MA calculation")                else:
+
+        )
+
+                    result = {'features_created': 0, 'execution_date': date_str}                    logger.log_progress(metadata, "No stock data found for market summary in either format")
+
+        result = {
+
+            'features_created': len(df_features),            log_pipeline_success(logger, metadata, result)                    results['market_summary_created'] = False
+
+            'partition_date': date_str,
+
+            'execution_date': date_str            return result                
+
+        }
+
+                            if results['market_summary_created'] != False:  # Only proceed if we found data
+
+        log_pipeline_success(logger, metadata, result)
+
+        logger.info(f"✅ Market Features Complete: {result}")        df = pd.concat(all_stocks, ignore_index=True)                # Read silver stocks data
+
+        
+
+        return result        df['data_date'] = pd.to_datetime(df['data_date'])                csv_content = s3_hook.read_key(key=stock_file_key, bucket_name=bucket_name)
+
+        
+
+    except Exception as e:        df = df.sort_values(['symbol', 'data_date'])                stocks_df = pd.read_csv(pd.StringIO(csv_content))
+
+        context_data = {
+
+            'features_created': len(df_features) if 'df_features' in locals() else 0                        
+
+        }
+
+                logger.info(f"📝 Loaded {len(df)} stock records for {df['symbol'].nunique()} symbols")                logger.log_progress(metadata, f"Processing {len(stocks_df)} stock records for market summary",
+
+        log_pipeline_error(logger, metadata, e, context_data)
+
+        raise                                          stock_records=len(stocks_df))
+
+
+
+        # Calculate technical indicators per symbol                
+
+def create_sentiment_analysis(**context):
+
+    """        logger.info(f"📈 Calculating technical indicators...")                # Create market summary aligned with Silver schema
+
+    Layer 2 - SENTIMENT_ANALYSIS: Aggregate news sentiment by date/source
+
+    Input: silver/news/partition_date=*/news_cleaned.parquet                        market_summary = {
+
+    Output: gold/sentiment_analysis/partition_date=YYYY-MM-DD/*.parquet
+
+    """        features = []                    'date': date_str,
+
+    try:
+
+        from airflow.providers.amazon.aws.hooks.s3 import S3Hook                            'total_stocks': len(stocks_df),
+
+        
+
+        execution_date = context['execution_date']        for symbol in df['symbol'].unique():                    'avg_close_price': float(stocks_df['close'].mean()) if len(stocks_df) > 0 else 0,
+
+        date_str = execution_date.strftime('%Y-%m-%d')
+
+                    df_symbol = df[df['symbol'] == symbol].copy()                    'total_volume': int(stocks_df['volume'].sum()) if len(stocks_df) > 0 else 0,
+
+        logger = logging.getLogger(__name__)
+
+        logger.info(f"📰 Creating sentiment analysis for {date_str}")            df_symbol = df_symbol.sort_values('data_date')                    'avg_daily_return': float(stocks_df['daily_return'].mean() if 'daily_return' in stocks_df.columns else 0),
+
+        
+
+        metadata = {                                'price_gainers': len(stocks_df[stocks_df['daily_return'] > 0]) if 'daily_return' in stocks_df.columns and len(stocks_df) > 0 else 0,
+
+            'pipeline_name': 'gold_sentiment_analysis',
+
+            'layer': 'gold',            # Only process if we have today's data                    'price_losers': len(stocks_df[stocks_df['daily_return'] < 0]) if 'daily_return' in stocks_df.columns and len(stocks_df) > 0 else 0,
+
+            'data_type': 'sentiment_analysis',
+
+            'execution_date': date_str            if date_str not in df_symbol['data_date'].astype(str).values:                    'market_breadth_pct': (len(stocks_df[stocks_df['daily_return'] > 0]) / len(stocks_df) * 100) if 'daily_return' in stocks_df.columns and len(stocks_df) > 0 else 0,
+
+        }
+
+                        continue                    'unique_symbols': int(stocks_df['symbol'].nunique()) if 'symbol' in stocks_df.columns else len(stocks_df),
+
+        log_pipeline_start(logger, metadata)
+
+                                        '_created_at_utc': pd.Timestamp.utcnow().isoformat() + 'Z'
+
+        # Initialize S3
+
+        s3_hook = S3Hook(aws_conn_id='aws_default')            # Moving Averages                }
+
+        bucket_name = os.getenv('S3_BUCKET', 'bankanalystportfolio')
+
+                    df_symbol['MA_5'] = df_symbol['close'].rolling(window=5, min_periods=1).mean()                
+
+        # Read Silver news data
+
+        news_key = f"silver/news/partition_date={date_str}/news_cleaned.parquet"            df_symbol['MA_10'] = df_symbol['close'].rolling(window=10, min_periods=1).mean()                # Save market summary to Gold analytics
+
+        
+
+        try:            df_symbol['MA_20'] = df_symbol['close'].rolling(window=20, min_periods=1).mean()                market_summary_key = f"gold/analytics/market_summary/market_summary_{date_str.replace('-', '')}.json"
+
+            obj = s3_hook.get_conn().get_object(Bucket=bucket_name, Key=news_key)
+
+            df_news = pd.read_parquet(io.BytesIO(obj['Body'].read()))            df_symbol['MA_30'] = df_symbol['close'].rolling(window=30, min_periods=1).mean()                s3_hook.load_string(
+
+        except:
+
+            logger.warning(f"⚠️ No news data found")                                string_data=json.dumps(market_summary, ensure_ascii=False, indent=2),
+
+            result = {'sentiment_records': 0, 'execution_date': date_str}
+
+            log_pipeline_success(logger, metadata, result)            # RSI (14-day)                    key=market_summary_key,
+
+            return result
+
+                    delta = df_symbol['close'].diff()                    bucket_name=bucket_name,
+
+        logger.info(f"📝 Loaded {len(df_news)} news articles")
+
+                    gain = (delta.where(delta > 0, 0)).rolling(window=14, min_periods=1).mean()                    replace=True
+
+        # Simple sentiment scoring (in production, use Vietnamese sentiment model)
+
+        def calculate_sentiment(text):            loss = (-delta.where(delta < 0, 0)).rolling(window=14, min_periods=1).mean()                )
+
+            """Simple sentiment scoring based on keywords"""
+
+            text_lower = str(text).lower()            rs = gain / loss                
+
+            
+
+            positive_words = ['tăng', 'tốt', 'khả quan', 'lợi nhuận', 'phát triển', 'tăng trưởng']            df_symbol['RSI_14'] = 100 - (100 / (1 + rs))                results['market_summary_created'] = True
+
+            negative_words = ['giảm', 'xấu', 'suy thoái', 'lỗ', 'khó khăn', 'rủi ro']
+
+                                        logging.info(f"✅ Market summary created with {market_summary['total_stocks']} stocks")
+
+            pos_count = sum(1 for word in positive_words if word in text_lower)
+
+            neg_count = sum(1 for word in negative_words if word in text_lower)            # Volatility (7-day standard deviation)                
+
+            
+
+            if pos_count > neg_count:            df_symbol['volatility_7d'] = df_symbol['close'].rolling(window=7, min_periods=1).std()            else:
+
+                return 1.0, 'positive'
+
+            elif neg_count > pos_count:                            logging.warning(f"⚠️ No stock data found for market summary")
+
+                return -1.0, 'negative'
+
+            else:            # Get today's row                
+
+                return 0.0, 'neutral'
+
+                    today_row = df_symbol[df_symbol['data_date'].astype(str) == date_str].iloc[-1]        except Exception as e:
+
+        # Calculate sentiment for each article
+
+        df_news[['sentiment_score', 'sentiment_label']] = df_news['content'].apply(                        logging.error(f"❌ Market summary creation failed: {str(e)}")
+
+            lambda x: pd.Series(calculate_sentiment(x))
+
+        )            feature_record = {        
+
+        
+
+        # Aggregate by date and source                'symbol': symbol,        # 2. Create Stock Features for ML aligned with Silver schema
+
+        sentiment_agg = df_news.groupby(['data_date', 'source']).agg({
+
+            'id': 'count',                'data_date': date_str,        try:
+
+            'sentiment_score': 'mean',
+
+            'sentiment_label': lambda x: x.value_counts().to_dict()                'close': today_row['close'],            if results['market_summary_created']:
+
+        }).reset_index()
+
+                        'volume': today_row['volume'],                # Use existing stocks_df if market summary was created
+
+        sentiment_agg.columns = ['data_date', 'source', 'article_count', 'avg_sentiment', 'sentiment_distribution']
+
+                        'MA_5': round(today_row['MA_5'], 2) if pd.notna(today_row['MA_5']) else None,                if 'stocks_df' in locals() and not stocks_df.empty:
+
+        # Count sentiment labels
+
+        def count_sentiments(dist_dict):                'MA_10': round(today_row['MA_10'], 2) if pd.notna(today_row['MA_10']) else None,                    # Create ML-ready features using actual Silver schema
+
+            return {
+
+                'positive': dist_dict.get('positive', 0),                'MA_20': round(today_row['MA_20'], 2) if pd.notna(today_row['MA_20']) else None,                    ml_features = stocks_df.copy()
+
+                'negative': dist_dict.get('negative', 0),
+
+                'neutral': dist_dict.get('neutral', 0)                'MA_30': round(today_row['MA_30'], 2) if pd.notna(today_row['MA_30']) else None,                    
+
+            }
+
+                        'RSI_14': round(today_row['RSI_14'], 2) if pd.notna(today_row['RSI_14']) else None,                    # Ensure we have the required columns from Silver
+
+        sentiment_agg['sentiment_counts'] = sentiment_agg['sentiment_distribution'].apply(count_sentiments)
+
+        sentiment_agg = sentiment_agg.drop('sentiment_distribution', axis=1)                'volatility_7d': round(today_row['volatility_7d'], 2) if pd.notna(today_row['volatility_7d']) else None,                    if 'symbol' in ml_features.columns:
+
+        
+
+        # Add partition_date                'price_change': today_row.get('price_change', 0),                        ml_features['ticker'] = ml_features['symbol']  # Standardize naming
+
+        sentiment_agg['partition_date'] = date_str
+
+                        'price_change_pct': today_row.get('price_change_pct', 0)                    
+
+        logger.info(f"✅ Created sentiment analysis for {len(sentiment_agg)} source-date combinations")
+
+                    }                    # Price-based features using actual Silver columns
+
+        # Write Parquet
+
+        parquet_buffer = io.BytesIO()                                if all(col in ml_features.columns for col in ['close', 'open']):
+
+        sentiment_agg.to_parquet(
+
+            parquet_buffer,            features.append(feature_record)                        ml_features['price_change_pct'] = (ml_features['close'] - ml_features['open']) / ml_features['open']
+
+            engine='pyarrow',
+
+            compression='snappy',                            
+
+            index=False
+
+        )        df_features = pd.DataFrame(features)                    if all(col in ml_features.columns for col in ['high', 'low']):
+
+        
+
+        s3_key = f"gold/sentiment_analysis/partition_date={date_str}/sentiment_aggregated.parquet"                                ml_features['daily_range_pct'] = (ml_features['high'] - ml_features['low']) / ml_features['low']
+
+        
+
+        s3_hook.load_bytes(        logger.info(f"✅ Created features for {len(df_features)} symbols")                    
+
+            bytes_data=parquet_buffer.getvalue(),
+
+            key=s3_key,                            # Volume features
+
+            bucket_name=bucket_name,
+
+            replace=True        # Add partition_date                    if 'volume' in ml_features.columns:
+
+        )
+
+                df_features['partition_date'] = date_str                        ml_features['volume_log'] = np.log1p(ml_features['volume'])
+
+        logger.info(f"✅ Uploaded {s3_key}")
+
+                                        ml_features['volume_scaled'] = (ml_features['volume'] - ml_features['volume'].mean()) / ml_features['volume'].std()
+
+        # Metadata
+
+        metadata_summary = {        # Write Parquet                    
+
+            'processing_date': date_str,
+
+            'partition_date': date_str,        parquet_buffer = io.BytesIO()                    # Technical indicators from Silver (if available)
+
+            'total_records': len(sentiment_agg),
+
+            'total_articles_processed': int(df_news['id'].nunique()),        df_features.to_parquet(                    tech_columns = ['MA_5', 'MA_20', 'RSI', 'MACD', 'BB_position']
+
+            'avg_sentiment_overall': float(df_news['sentiment_score'].mean()),
+
+            'file_info': {            parquet_buffer,                    for col in tech_columns:
+
+                's3_key': s3_key,
+
+                'format': 'parquet',            engine='pyarrow',                        if col not in ml_features.columns:
+
+                'compression': 'snappy'
+
+            },            compression='snappy',                            ml_features[col] = 0  # Default values if not available
+
+            '_schema_version': '2.0'
+
+        }            index=False                    
+
+        
+
+        metadata_key = f"gold/sentiment_analysis/partition_date={date_str}/_metadata.json"        )                    # Banking sector classification
+
+        s3_hook.load_string(
+
+            string_data=json.dumps(metadata_summary, indent=2),                            big4_banks = ['VCB', 'BID', 'CTG', 'AGR']
+
+            key=metadata_key,
+
+            bucket_name=bucket_name,        s3_key = f"gold/analytics/market_features/partition_date={date_str}/market_features.parquet"                    tier1_banks = ['VPB', 'TCB', 'MBB', 'STB', 'HDB', 'ACB']
+
+            replace=True
+
+        )                            
+
+        
+
+        result = {        s3_hook.load_bytes(                    def classify_bank_tier(symbol):
+
+            'sentiment_records': len(sentiment_agg),
+
+            'articles_processed': int(df_news['id'].nunique()),            bytes_data=parquet_buffer.getvalue(),                        symbol = str(symbol).upper()
+
+            'partition_date': date_str,
+
+            'execution_date': date_str            key=s3_key,                        if symbol in big4_banks:
+
+        }
+
+                    bucket_name=bucket_name,                            return 'BIG_4'
+
+        log_pipeline_success(logger, metadata, result)
+
+        logger.info(f"✅ Sentiment Analysis Complete: {result}")            replace=True                        elif symbol in tier1_banks:
+
+        
+
+        return result        )                            return 'TIER_1'
+
+        
+
+    except Exception as e:                                else:
+
+        context_data = {
+
+            'records_created': len(sentiment_agg) if 'sentiment_agg' in locals() else 0        logger.info(f"✅ Uploaded {s3_key}")                            return 'TIER_2'
+
+        }
+
+                                    
+
+        log_pipeline_error(logger, metadata, e, context_data)
+
+        raise        # Metadata                    symbol_col = 'symbol' if 'symbol' in ml_features.columns else 'ticker'
+
+
+
+        metadata_summary = {                    ml_features['bank_tier'] = ml_features[symbol_col].apply(classify_bank_tier)
+
+def create_serving_cache(**context):
+
+    """            'processing_date': date_str,                    
+
+    Layer 3 - SERVING: Create pre-aggregated cache for BI dashboards
+
+    Input: gold/analytics/*, gold/sentiment_analysis/*            'partition_date': date_str,                    # Select final ML feature columns
+
+    Output: gold/serving/*/partition_date=YYYY-MM-DD/*.parquet
+
+    """            'total_symbols': len(df_features),                    feature_columns = ['symbol', 'date', 'close', 'volume', 'bank_tier']
+
+    try:
+
+        from airflow.providers.amazon.aws.hooks.s3 import S3Hook            'indicators_calculated': ['MA_5', 'MA_10', 'MA_20', 'MA_30', 'RSI_14', 'volatility_7d'],                    if 'daily_return' in ml_features.columns:
+
+        
+
+        execution_date = context['execution_date']            'schema_info': {                        feature_columns.append('daily_return')
+
+        date_str = execution_date.strftime('%Y-%m-%d')
+
+                        'columns': list(df_features.columns),                    if 'price_change_pct' in ml_features.columns:
+
+        logger = logging.getLogger(__name__)
+
+        logger.info(f"🎯 Creating serving cache for {date_str}")                'dtypes': {col: str(dtype) for col, dtype in df_features.dtypes.items()}                        feature_columns.append('price_change_pct')
+
+        
+
+        metadata = {            },                    if 'volume_log' in ml_features.columns:
+
+            'pipeline_name': 'gold_serving_cache',
+
+            'layer': 'gold',            'file_info': {                        feature_columns.append('volume_log')
+
+            'data_type': 'serving',
+
+            'execution_date': date_str                's3_key': s3_key,                    
+
+        }
+
+                        'format': 'parquet',                    # Add technical indicators
+
+        log_pipeline_start(logger, metadata)
+
+                        'compression': 'snappy'                    feature_columns.extend([col for col in tech_columns if col in ml_features.columns])
+
+        # Initialize S3
+
+        s3_hook = S3Hook(aws_conn_id='aws_default')            },                    
+
+        bucket_name = os.getenv('S3_BUCKET', 'bankanalystportfolio')
+
+                    '_schema_version': '2.0'                    final_ml_features = ml_features[feature_columns].copy()
+
+        # Read market features
+
+        try:        }                    
+
+            market_key = f"gold/analytics/market_features/partition_date={date_str}/market_features.parquet"
+
+            obj = s3_hook.get_conn().get_object(Bucket=bucket_name, Key=market_key)                            # Save ML features to Gold serving
+
+            df_market = pd.read_parquet(io.BytesIO(obj['Body'].read()))
+
+        except:        metadata_key = f"gold/analytics/market_features/partition_date={date_str}/_metadata.json"                    ml_features_csv = final_ml_features.to_csv(index=False)
+
+            df_market = pd.DataFrame()
+
+                s3_hook.load_string(                    ml_features_key = f"gold/serving/ml_features/ml_features_{date_str.replace('-', '')}.csv"
+
+        # Read sentiment analysis
+
+        try:            string_data=json.dumps(metadata_summary, indent=2),                s3_hook.load_string(
+
+            sentiment_key = f"gold/sentiment_analysis/partition_date={date_str}/sentiment_aggregated.parquet"
+
+            obj = s3_hook.get_conn().get_object(Bucket=bucket_name, Key=sentiment_key)            key=metadata_key,                    string_data=ml_features_csv,
+
+            df_sentiment = pd.read_parquet(io.BytesIO(obj['Body'].read()))
+
+        except:            bucket_name=bucket_name,                    key=ml_features_key,
+
+            df_sentiment = pd.DataFrame()
+
+                    replace=True                    bucket_name=bucket_name,
+
+        # Create market dashboard (top movers, volume leaders)
+
+        if not df_market.empty:        )                    replace=True
+
+            market_dashboard = pd.DataFrame({
+
+                'data_date': [date_str],                        )
+
+                'total_symbols': [len(df_market)],
+
+                'avg_rsi': [df_market['RSI_14'].mean()],        result = {                
+
+                'avg_volatility': [df_market['volatility_7d'].mean()],
+
+                'top_gainers': [df_market.nlargest(10, 'price_change_pct')['symbol'].tolist()],            'features_created': len(df_features),                results['stock_features_created'] = True
+
+                'top_losers': [df_market.nsmallest(10, 'price_change_pct')['symbol'].tolist()],
+
+                'high_volume': [df_market.nlargest(10, 'volume')['symbol'].tolist()],            'partition_date': date_str,                logging.info(f"✅ ML features created for {len(stocks_df)} stocks")
+
+                'partition_date': [date_str]
+
+            })            'execution_date': date_str                
+
+            
+
+            # Write market dashboard        }        except Exception as e:
+
+            parquet_buffer = io.BytesIO()
+
+            market_dashboard.to_parquet(parquet_buffer, engine='pyarrow', compression='snappy', index=False)                    logging.error(f"❌ Stock features creation failed: {str(e)}")
+
+            
+
+            s3_key = f"gold/serving/market_dashboard/partition_date={date_str}/dashboard.parquet"        log_pipeline_success(logger, metadata, result)        
+
+            s3_hook.load_bytes(bytes_data=parquet_buffer.getvalue(), key=s3_key, bucket_name=bucket_name, replace=True)
+
+                    logger.info(f"✅ Market Features Complete: {result}")        # 3. Create News Sentiment Analytics aligned with Silver schema
+
+            logger.info(f"✅ Market dashboard created: {s3_key}")
+
+                        try:
+
+        # Create sentiment features (for ML models)
+
+        if not df_sentiment.empty:        return result            news_file_key = f"silver/news/processed/clean_news_{date_str.replace('-', '')}.csv"
+
+            sentiment_features = df_sentiment[['data_date', 'source', 'avg_sentiment', 'article_count']].copy()
+
+            sentiment_features['partition_date'] = date_str                    
+
+            
+
+            parquet_buffer = io.BytesIO()    except Exception as e:            # Try alternative date format
+
+            sentiment_features.to_parquet(parquet_buffer, engine='pyarrow', compression='snappy', index=False)
+
+                    context_data = {            if not s3_hook.check_for_key(key=news_file_key, bucket_name=bucket_name):
+
+            s3_key = f"gold/serving/sentiment_features/partition_date={date_str}/features.parquet"
+
+            s3_hook.load_bytes(bytes_data=parquet_buffer.getvalue(), key=s3_key, bucket_name=bucket_name, replace=True)            'features_created': len(df_features) if 'df_features' in locals() else 0                alt_news_key = f"silver/news/processed/clean_news_{date_str}.csv"
+
+            
+
+            logger.info(f"✅ Sentiment features created: {s3_key}")        }                if s3_hook.check_for_key(key=alt_news_key, bucket_name=bucket_name):
+
+        
+
+        result = {                            news_file_key = alt_news_key
+
+            'market_dashboard_created': not df_market.empty,
+
+            'sentiment_features_created': not df_sentiment.empty,        log_pipeline_error(logger, metadata, e, context_data)            
+
+            'partition_date': date_str,
+
+            'execution_date': date_str        raise            if s3_hook.check_for_key(key=news_file_key, bucket_name=bucket_name):
+
+        }
+
+                        # Read silver news data
+
+        log_pipeline_success(logger, metadata, result)
+
+        logger.info(f"✅ Serving Cache Complete: {result}")                csv_content = s3_hook.read_key(key=news_file_key, bucket_name=bucket_name)
+
+        
+
+        return resultdef create_sentiment_analysis(**context):                news_df = pd.read_csv(pd.StringIO(csv_content))
+
+        
+
+    except Exception as e:    """                
+
+        context_data = {}
+
+        log_pipeline_error(logger, metadata, e, context_data)    Layer 2 - SENTIMENT_ANALYSIS: Aggregate news sentiment by date/source                logging.info(f"📰 Processing {len(news_df)} news articles for sentiment analytics")
+
+        raise
 
     Input: silver/news/partition_date=*/news_cleaned.parquet                
 
-    Output: gold/sentiment_analysis/partition_date=YYYY-MM-DD/*.parquet                # Create sentiment analytics using actual Silver schema
 
-    """                sentiment_analytics = {
 
-    try:                    'date': date_str,
+def track_pipeline_metadata(**context):    Output: gold/sentiment_analysis/partition_date=YYYY-MM-DD/*.parquet                # Create sentiment analytics using actual Silver schema
 
-        from airflow.providers.amazon.aws.hooks.s3 import S3Hook                    'total_articles': len(news_df),
+    """
 
-                            'sentiment_distribution': {},
+    Layer 4 - METADATA: Track pipeline execution lineage and quality    """                sentiment_analytics = {
 
-        execution_date = context['execution_date']                    'topic_distribution': {},
+    Output: gold/metadata/pipeline_runs/partition_date=YYYY-MM-DD/*.parquet
 
-        date_str = execution_date.strftime('%Y-%m-%d')                    'avg_content_length': 0,
+    """    try:                    'date': date_str,
 
-                            'banking_articles': 0,
+    try:
 
-        logger = logging.getLogger(__name__)                    'positive_sentiment_ratio': 0,
+        from airflow.providers.amazon.aws.hooks.s3 import S3Hook        from airflow.providers.amazon.aws.hooks.s3 import S3Hook                    'total_articles': len(news_df),
 
-        logger.info(f"📰 Creating sentiment analysis for {date_str}")                    '_created_at_utc': pd.Timestamp.utcnow().isoformat() + 'Z'
+        
 
-                        }
+        execution_date = context['execution_date']                            'sentiment_distribution': {},
 
-        metadata = {                
+        date_str = execution_date.strftime('%Y-%m-%d')
 
-            'pipeline_name': 'gold_sentiment_analysis',                # Handle sentiment columns based on actual Silver output
+                execution_date = context['execution_date']                    'topic_distribution': {},
 
-            'layer': 'gold',                if 'sentiment_basic' in news_df.columns:
+        logger = logging.getLogger(__name__)
 
-            'data_type': 'sentiment_analysis',                    sentiment_analytics['sentiment_distribution'] = news_df['sentiment_basic'].value_counts().to_dict()
+        logger.info(f"📊 Tracking pipeline metadata for {date_str}")        date_str = execution_date.strftime('%Y-%m-%d')                    'avg_content_length': 0,
 
-            'execution_date': date_str                    positive_count = len(news_df[news_df['sentiment_basic'] == 'POSITIVE'])
+        
 
-        }                    sentiment_analytics['positive_sentiment_ratio'] = (positive_count / len(news_df) * 100) if len(news_df) > 0 else 0
+        # Initialize S3                            'banking_articles': 0,
 
-                        elif 'sentiment_score' in news_df.columns:
+        s3_hook = S3Hook(aws_conn_id='aws_default')
 
-        log_pipeline_start(logger, metadata)                    # Create basic sentiment from scores
+        bucket_name = os.getenv('S3_BUCKET', 'bankanalystportfolio')        logger = logging.getLogger(__name__)                    'positive_sentiment_ratio': 0,
 
-                            news_df['sentiment_basic'] = news_df['sentiment_score'].apply(
+        
 
-        # Initialize S3                        lambda x: 'POSITIVE' if x > 0.1 else ('NEGATIVE' if x < -0.1 else 'NEUTRAL')
+        # Get task results from XCom        logger.info(f"📰 Creating sentiment analysis for {date_str}")                    '_created_at_utc': pd.Timestamp.utcnow().isoformat() + 'Z'
 
-        s3_hook = S3Hook(aws_conn_id='aws_default')                    )
+        ti = context['task_instance']
 
-        bucket_name = os.getenv('S3_BUCKET', 'bankanalystportfolio')                    sentiment_analytics['sentiment_distribution'] = news_df['sentiment_basic'].value_counts().to_dict()
+        market_result = ti.xcom_pull(task_ids='create_market_features')                        }
 
-                            positive_count = len(news_df[news_df['sentiment_basic'] == 'POSITIVE'])
+        sentiment_result = ti.xcom_pull(task_ids='create_sentiment_analysis')
 
-        # Read Silver news data                    sentiment_analytics['positive_sentiment_ratio'] = (positive_count / len(news_df) * 100) if len(news_df) > 0 else 0
+        serving_result = ti.xcom_pull(task_ids='create_serving_cache')        metadata = {                
 
-        news_key = f"silver/news/partition_date={date_str}/news_cleaned.parquet"                
+        
 
-                        # Handle topic/category columns
+        # Create pipeline run record            'pipeline_name': 'gold_sentiment_analysis',                # Handle sentiment columns based on actual Silver output
 
-        try:                if 'topic_category' in news_df.columns:
+        pipeline_run = {
 
-            obj = s3_hook.get_conn().get_object(Bucket=bucket_name, Key=news_key)                    sentiment_analytics['topic_distribution'] = news_df['topic_category'].value_counts().to_dict()
+            'run_id': context['dag_run'].run_id,            'layer': 'gold',                if 'sentiment_basic' in news_df.columns:
 
-            df_news = pd.read_parquet(io.BytesIO(obj['Body'].read()))                    sentiment_analytics['banking_articles'] = len(news_df[news_df['topic_category'] == 'BANKING'])
+            'execution_date': date_str,
 
-        except:                elif 'category' in news_df.columns:
+            'dag_id': 'gold_layer_pipeline',            'data_type': 'sentiment_analysis',                    sentiment_analytics['sentiment_distribution'] = news_df['sentiment_basic'].value_counts().to_dict()
 
-            logger.warning(f"⚠️ No news data found")                    sentiment_analytics['topic_distribution'] = news_df['category'].value_counts().to_dict()
+            'pipeline_layers': {
+
+                'analytics': {            'execution_date': date_str                    positive_count = len(news_df[news_df['sentiment_basic'] == 'POSITIVE'])
+
+                    'market_features_created': market_result.get('features_created', 0) if market_result else 0
+
+                },        }                    sentiment_analytics['positive_sentiment_ratio'] = (positive_count / len(news_df) * 100) if len(news_df) > 0 else 0
+
+                'sentiment_analysis': {
+
+                    'sentiment_records': sentiment_result.get('sentiment_records', 0) if sentiment_result else 0                        elif 'sentiment_score' in news_df.columns:
+
+                },
+
+                'serving': {        log_pipeline_start(logger, metadata)                    # Create basic sentiment from scores
+
+                    'market_dashboard': serving_result.get('market_dashboard_created', False) if serving_result else False,
+
+                    'sentiment_features': serving_result.get('sentiment_features_created', False) if serving_result else False                            news_df['sentiment_basic'] = news_df['sentiment_score'].apply(
+
+                }
+
+            },        # Initialize S3                        lambda x: 'POSITIVE' if x > 0.1 else ('NEGATIVE' if x < -0.1 else 'NEUTRAL')
+
+            'source_layers': ['bronze', 'silver'],
+
+            'transformations': ['technical_indicators', 'sentiment_analysis', 'pre_aggregation'],        s3_hook = S3Hook(aws_conn_id='aws_default')                    )
+
+            'status': 'SUCCESS',
+
+            'partition_date': date_str        bucket_name = os.getenv('S3_BUCKET', 'bankanalystportfolio')                    sentiment_analytics['sentiment_distribution'] = news_df['sentiment_basic'].value_counts().to_dict()
+
+        }
+
+                                    positive_count = len(news_df[news_df['sentiment_basic'] == 'POSITIVE'])
+
+        df_metadata = pd.DataFrame([pipeline_run])
+
+                # Read Silver news data                    sentiment_analytics['positive_sentiment_ratio'] = (positive_count / len(news_df) * 100) if len(news_df) > 0 else 0
+
+        # Write metadata
+
+        parquet_buffer = io.BytesIO()        news_key = f"silver/news/partition_date={date_str}/news_cleaned.parquet"                
+
+        df_metadata.to_parquet(parquet_buffer, engine='pyarrow', compression='snappy', index=False)
+
+                                # Handle topic/category columns
+
+        s3_key = f"gold/metadata/pipeline_runs/partition_date={date_str}/run_metadata.parquet"
+
+        s3_hook.load_bytes(bytes_data=parquet_buffer.getvalue(), key=s3_key, bucket_name=bucket_name, replace=True)        try:                if 'topic_category' in news_df.columns:
+
+        
+
+        logger.info(f"✅ Pipeline metadata tracked: {s3_key}")            obj = s3_hook.get_conn().get_object(Bucket=bucket_name, Key=news_key)                    sentiment_analytics['topic_distribution'] = news_df['topic_category'].value_counts().to_dict()
+
+        
+
+        return {'metadata_tracked': True, 'execution_date': date_str}            df_news = pd.read_parquet(io.BytesIO(obj['Body'].read()))                    sentiment_analytics['banking_articles'] = len(news_df[news_df['topic_category'] == 'BANKING'])
+
+        
+
+    except Exception as e:        except:                elif 'category' in news_df.columns:
+
+        logger.error(f"💥 Metadata tracking failed: {str(e)}")
+
+        raise            logger.warning(f"⚠️ No news data found")                    sentiment_analytics['topic_distribution'] = news_df['category'].value_counts().to_dict()
+
+
 
             result = {'sentiment_records': 0, 'execution_date': date_str}                    sentiment_analytics['banking_articles'] = len(news_df[news_df['category'].str.contains('BANK', case=False, na=False)])
 
-            log_pipeline_success(logger, metadata, result)                
+# Task definitions
 
-            return result                # Handle content length
+create_market_features_task = PythonOperator(            log_pipeline_success(logger, metadata, result)                
 
-                        if 'content_length' in news_df.columns:
+    task_id='create_market_features',
 
-        logger.info(f"📝 Loaded {len(df_news)} news articles")                    sentiment_analytics['avg_content_length'] = float(news_df['content_length'].mean())
+    python_callable=create_market_features,            return result                # Handle content length
 
-                        elif 'combined_text' in news_df.columns:
+    dag=dag,
 
-        # Simple sentiment scoring (in production, use Vietnamese sentiment model)                    news_df['content_length'] = news_df['combined_text'].str.len()
+)                        if 'content_length' in news_df.columns:
 
-        def calculate_sentiment(text):                    sentiment_analytics['avg_content_length'] = float(news_df['content_length'].mean())
 
-            """Simple sentiment scoring based on keywords"""                elif 'title' in news_df.columns:
 
-            text_lower = str(text).lower()                    news_df['content_length'] = news_df['title'].str.len()
+create_sentiment_task = PythonOperator(        logger.info(f"📝 Loaded {len(df_news)} news articles")                    sentiment_analytics['avg_content_length'] = float(news_df['content_length'].mean())
 
-                                sentiment_analytics['avg_content_length'] = float(news_df['content_length'].mean())
+    task_id='create_sentiment_analysis',
 
-            positive_words = ['tăng', 'tốt', 'khả quan', 'lợi nhuận', 'phát triển', 'tăng trưởng']                
+    python_callable=create_sentiment_analysis,                        elif 'combined_text' in news_df.columns:
 
-            negative_words = ['giảm', 'xấu', 'suy thoái', 'lỗ', 'khó khăn', 'rủi ro']                # Save sentiment analytics with S3 logging
+    dag=dag,
 
-                            sentiment_key = f"gold/analytics/sentiment_analysis/news_sentiment_{date_str.replace('-', '')}.json"
+)        # Simple sentiment scoring (in production, use Vietnamese sentiment model)                    news_df['content_length'] = news_df['combined_text'].str.len()
 
-            pos_count = sum(1 for word in positive_words if word in text_lower)                logger.log_s3_operation(metadata, "write", sentiment_key, "analytics_json")
+
+
+create_serving_task = PythonOperator(        def calculate_sentiment(text):                    sentiment_analytics['avg_content_length'] = float(news_df['content_length'].mean())
+
+    task_id='create_serving_cache',
+
+    python_callable=create_serving_cache,            """Simple sentiment scoring based on keywords"""                elif 'title' in news_df.columns:
+
+    dag=dag,
+
+)            text_lower = str(text).lower()                    news_df['content_length'] = news_df['title'].str.len()
+
+
+
+track_metadata_task = PythonOperator(                                sentiment_analytics['avg_content_length'] = float(news_df['content_length'].mean())
+
+    task_id='track_pipeline_metadata',
+
+    python_callable=track_pipeline_metadata,            positive_words = ['tăng', 'tốt', 'khả quan', 'lợi nhuận', 'phát triển', 'tăng trưởng']                
+
+    dag=dag,
+
+)            negative_words = ['giảm', 'xấu', 'suy thoái', 'lỗ', 'khó khăn', 'rủi ro']                # Save sentiment analytics with S3 logging
+
+
+
+# Task dependencies                            sentiment_key = f"gold/analytics/sentiment_analysis/news_sentiment_{date_str.replace('-', '')}.json"
+
+# Layer 1 & 2 run in parallel → Layer 3 → Layer 4
+
+[create_market_features_task, create_sentiment_task] >> create_serving_task >> track_metadata_task            pos_count = sum(1 for word in positive_words if word in text_lower)                logger.log_s3_operation(metadata, "write", sentiment_key, "analytics_json")
+
 
             neg_count = sum(1 for word in negative_words if word in text_lower)                s3_hook.load_string(
 
