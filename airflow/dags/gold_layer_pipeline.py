@@ -36,8 +36,8 @@ import json
 import logging
 import sys
 
-sys.path.append('/opt/airflow/dags')
-from enhanced_logger import log_pipeline_start, log_pipeline_success, log_pipeline_error
+# sys.path.append('/opt/airflow/dags')
+# Removed enhanced_logger import for simplified testing
 
 # Configuration
 S3_BUCKET = 'bankanalystportfolio'
@@ -95,7 +95,8 @@ def create_market_features(**context):
     Output: gold/analytics/market_features/partition_date=YYYY-MM-DD/*.parquet
     """
     execution_date = context['execution_date']
-    log_pipeline_start('gold_layer', 'create_market_features', execution_date)
+    # Simple logging instead of enhanced logger calls
+    logging.info(f"🚀 Starting gold_layer create_market_features operation")
     
     try:
         s3_hook = S3Hook(aws_conn_id=S3_CONN_ID)
@@ -182,11 +183,11 @@ def create_market_features(**context):
             replace=True
         )
         
-        log_pipeline_success('gold_layer', 'create_market_features', len(market_features_df))
-        logging.info(f"Market features created: {len(market_features_df)} records, {market_features_df['symbol'].nunique()} symbols")
+        logging.info("✅ Operation completed successfully")
+        logging.info(f"✅ Market features completed successfully: {len(market_features_df)} records, {market_features_df['symbol'].nunique()} symbols")
         
     except Exception as e:
-        log_pipeline_error('gold_layer', 'create_market_features', str(e))
+        logging.error(f"❌ Error in create_market_features: {str(e)}")
         raise
 
 def create_sector_performance(**context):
@@ -196,7 +197,7 @@ def create_sector_performance(**context):
     Output: gold/analytics/sector_performance/partition_date=YYYY-MM-DD/*.parquet
     """
     execution_date = context['execution_date']
-    log_pipeline_start('gold_layer', 'create_sector_performance', execution_date)
+    logging.info("🚀 Starting operation")
     
     try:
         s3_hook = S3Hook(aws_conn_id=S3_CONN_ID)
@@ -245,11 +246,11 @@ def create_sector_performance(**context):
         s3_key = f'{gold_prefix}sector_performance_{end_date.strftime("%Y%m%d")}.parquet'
         s3_hook.load_bytes(parquet_buffer.read(), key=s3_key, bucket_name=S3_BUCKET, replace=True)
         
-        log_pipeline_success('gold_layer', 'create_sector_performance', len(sector_agg))
+        logging.info("✅ Operation completed successfully")
         logging.info(f"Sector performance created: {len(sector_agg)} sectors")
         
     except Exception as e:
-        log_pipeline_error('gold_layer', 'create_sector_performance', str(e))
+        logging.error("❌ Operation failed")
         raise
 
 def create_news_summary(**context):
@@ -259,7 +260,7 @@ def create_news_summary(**context):
     Output: gold/analytics/news_summary/partition_date=YYYY-MM-DD/*.parquet
     """
     execution_date = context['execution_date']
-    log_pipeline_start('gold_layer', 'create_news_summary', execution_date)
+    logging.info("🚀 Starting operation")
     
     try:
         s3_hook = S3Hook(aws_conn_id=S3_CONN_ID)
@@ -302,11 +303,11 @@ def create_news_summary(**context):
         s3_key = f'{gold_prefix}news_summary_{end_date.strftime("%Y%m%d")}.parquet'
         s3_hook.load_bytes(parquet_buffer.read(), key=s3_key, bucket_name=S3_BUCKET, replace=True)
         
-        log_pipeline_success('gold_layer', 'create_news_summary', 1)
+        logging.info("✅ Operation completed successfully")
         logging.info(f"News summary created: {news_summary['total_articles']} articles")
         
     except Exception as e:
-        log_pipeline_error('gold_layer', 'create_news_summary', str(e))
+        logging.error("❌ Operation failed")
         raise
 
 def create_macro_indicators(**context):
@@ -316,7 +317,7 @@ def create_macro_indicators(**context):
     Output: gold/analytics/macro_indicators/partition_date=YYYY-MM-DD/*.parquet
     """
     execution_date = context['execution_date']
-    log_pipeline_start('gold_layer', 'create_macro_indicators', execution_date)
+    logging.info("🚀 Starting operation")
     
     try:
         s3_hook = S3Hook(aws_conn_id=S3_CONN_ID)
@@ -380,11 +381,11 @@ def create_macro_indicators(**context):
             s3_key = f'{gold_prefix}macro_indicators_{end_date.strftime("%Y%m%d")}.parquet'
             s3_hook.load_bytes(parquet_buffer.read(), key=s3_key, bucket_name=S3_BUCKET, replace=True)
             
-            log_pipeline_success('gold_layer', 'create_macro_indicators', len(final_indicators))
+            logging.info("✅ Operation completed successfully")
             logging.info(f"Macro indicators created: {len(final_indicators)} indicators")
         
     except Exception as e:
-        log_pipeline_error('gold_layer', 'create_macro_indicators', str(e))
+        logging.error("❌ Operation failed")
         raise
 
 def create_sentiment_analysis(**context):
@@ -394,7 +395,7 @@ def create_sentiment_analysis(**context):
     Output: gold/sentiment_analysis/partition_date=YYYY-MM-DD/*.parquet
     """
     execution_date = context['execution_date']
-    log_pipeline_start('gold_layer', 'create_sentiment_analysis', execution_date)
+    logging.info("🚀 Starting operation")
     
     try:
         s3_hook = S3Hook(aws_conn_id=S3_CONN_ID)
@@ -460,11 +461,11 @@ def create_sentiment_analysis(**context):
         s3_key = f'{gold_prefix}sentiment_analysis_{end_date.strftime("%Y%m%d")}.parquet'
         s3_hook.load_bytes(parquet_buffer.read(), key=s3_key, bucket_name=S3_BUCKET, replace=True)
         
-        log_pipeline_success('gold_layer', 'create_sentiment_analysis', len(sentiment_agg))
+        logging.info("✅ Operation completed successfully")
         logging.info(f"Sentiment analysis created: {len(sentiment_agg)} aggregations")
         
     except Exception as e:
-        log_pipeline_error('gold_layer', 'create_sentiment_analysis', str(e))
+        logging.error("❌ Operation failed")
         raise
 
 def create_serving_cache(**context):
@@ -474,7 +475,7 @@ def create_serving_cache(**context):
     Output: gold/serving/*/partition_date=YYYY-MM-DD/*.parquet
     """
     execution_date = context['execution_date']
-    log_pipeline_start('gold_layer', 'create_serving_cache', execution_date)
+    logging.info("🚀 Starting operation")
     
     try:
         s3_hook = S3Hook(aws_conn_id=S3_CONN_ID)
@@ -545,11 +546,11 @@ def create_serving_cache(**context):
             s3_hook.load_bytes(parquet_buffer.read(), key=s3_key, bucket_name=S3_BUCKET, replace=True)
             logging.info("Risk metrics cache created")
         
-        log_pipeline_success('gold_layer', 'create_serving_cache', 1)
+        logging.info("✅ Operation completed successfully")
         logging.info("Serving cache creation completed")
         
     except Exception as e:
-        log_pipeline_error('gold_layer', 'create_serving_cache', str(e))
+        logging.error("❌ Operation failed")
         raise
 
 def track_pipeline_metadata(**context):
@@ -558,7 +559,7 @@ def track_pipeline_metadata(**context):
     Output: gold/metadata/pipeline_runs/partition_date=YYYY-MM-DD/*.json
     """
     execution_date = context['execution_date']
-    log_pipeline_start('gold_layer', 'track_pipeline_metadata', execution_date)
+    logging.info("🚀 Starting operation")
     
     try:
         s3_hook = S3Hook(aws_conn_id=S3_CONN_ID)
@@ -602,11 +603,11 @@ def track_pipeline_metadata(**context):
             replace=True
         )
         
-        log_pipeline_success('gold_layer', 'track_pipeline_metadata', 1)
+        logging.info("✅ Operation completed successfully")
         logging.info(f"Pipeline metadata tracked: {metadata_key}")
         
     except Exception as e:
-        log_pipeline_error('gold_layer', 'track_pipeline_metadata', str(e))
+        logging.error("❌ Operation failed")
         raise
 
 # Define tasks
