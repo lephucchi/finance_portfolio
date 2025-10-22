@@ -22,26 +22,26 @@ import os
 
 # Default args for all tasks
 default_args = {
-    'owner': 'banking-portfolio',
+    'owner': 'finance_portfolio',
     'depends_on_past': False,
-    'start_date': datetime(2025, 10, 16),
+    'start_date': datetime(2024, 1, 1),
     'email_on_failure': False,
     'email_on_retry': False,
-    'retries': int(os.getenv('MAX_RETRY_ATTEMPTS', 2)),
+    'retries': 2,
     'retry_delay': timedelta(minutes=5),
-    'execution_timeout': timedelta(hours=int(os.getenv('PIPELINE_TIMEOUT_HOURS', 4))),
+    'execution_timeout': timedelta(hours=4),
 }
 
 # DAG definition
 dag = DAG(
-    'master_pipeline_v2',
+    'master_pipeline',
     default_args=default_args,
-    description='Master orchestrator for Finance Portfolio ETL Pipeline with RAG integration',
+    description='Master orchestrator for Finance Portfolio ETL Pipeline (Bronze→Silver→Gold→RAG)',
     schedule_interval='0 6 * * 1-5',  # 6:00 AM weekdays
     catchup=False,
     max_active_runs=1,
     max_active_tasks=16,
-    tags=['master', 'production', 'etl', 'rag', 'v2.0'],
+    tags=['master', 'production', 'etl', 'rag'],
 )
 
 def check_market_status(**context):
@@ -198,7 +198,7 @@ dependency_check = PythonOperator(
 bronze_sensor = ExternalTaskSensor(
     task_id='wait_for_bronze_completion',
     external_dag_id='bronze_layer_pipeline',
-    external_task_id='validate_bronze_layer',
+    external_task_id='validate_bronze_data',
     allowed_states=['success'],
     failed_states=['failed', 'upstream_failed'],
     timeout=3600,  # 1 hour timeout
@@ -210,7 +210,7 @@ bronze_sensor = ExternalTaskSensor(
 silver_sensor = ExternalTaskSensor(
     task_id='wait_for_silver_completion',
     external_dag_id='silver_layer_pipeline',
-    external_task_id='validate_silver_output',
+    external_task_id='validate_silver_data',
     allowed_states=['success'],
     failed_states=['failed', 'upstream_failed'],
     timeout=3600,
@@ -222,7 +222,7 @@ silver_sensor = ExternalTaskSensor(
 gold_sensor = ExternalTaskSensor(
     task_id='wait_for_gold_completion',
     external_dag_id='gold_layer_pipeline',
-    external_task_id='validate_gold_output',
+    external_task_id='track_pipeline_metadata',
     allowed_states=['success'],
     failed_states=['failed', 'upstream_failed'],
     timeout=3600,
