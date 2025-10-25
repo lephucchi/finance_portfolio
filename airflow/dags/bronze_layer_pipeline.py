@@ -17,6 +17,7 @@ from datetime import datetime, timedelta
 import logging
 import json
 import os
+from enhanced_logger import log_pipeline_start, log_pipeline_success, log_pipeline_error
 
 # Default arguments
 default_args = {
@@ -44,14 +45,13 @@ dag = DAG(
 
 def extract_vnstock_data(**context):
     """
-    Extract stock OHLC data for ~150 Vietnam stocks with retry mechanism
+    Extract stock OHLC data for ~150 Vietnam stocks
     Output: bronze/stocks/raw/{ticker}_{date}.json (FLAT structure)
     """
     try:
         import vnstock3 as vs
         from airflow.providers.amazon.aws.hooks.s3 import S3Hook
         import time
-        import random
         
         execution_date = context['execution_date']
         date_str = execution_date.strftime('%Y-%m-%d')
@@ -59,35 +59,37 @@ def extract_vnstock_data(**context):
         logger = logging.getLogger(__name__)
         logger.info(f"📈 Starting stock data extraction for {date_str}")
         
+        # Enhanced logger metadata
+        metadata = {
+            'pipeline_name': 'bronze_stock_extraction',
+            'layer': 'bronze',
+            'data_type': 'stocks',
+            'execution_date': date_str
+        }
+        
+        log_pipeline_start(logger, metadata)
+        
         # Initialize vnstock and S3
         vnstock = vs.Vnstock()
         s3_hook = S3Hook(aws_conn_id='aws_default')
         bucket_name = os.getenv('S3_BUCKET', 'bankanalystportfolio')
         
-        # Configuration
-        MAX_RETRIES = 3
-        RETRY_DELAY = 3.0
-        REQUEST_DELAY = 2.5
-        
-        # Multiple data sources để fallback
-        SOURCES = ['TCBS', 'VCI', 'VND']
-        
         # Vietnam stock tickers (~150 stocks)
         tickers = [
             # VN30 stocks
             'ACB', 'BCM', 'BID', 'BVH', 'CTG', 'FPT', 'GAS', 'GVR', 'HDB', 'HPG',
-            'MBB', 'MSN', 'MWG', 'PLX', 'POW', 'SAB', 'SSI', 'STB', 'TCB', 'TPB',
-            'VCB', 'VHM', 'VIB', 'VIC', 'VJC', 'VNM', 'VPB', 'VRE',
-            # Additional blue chips
-            'AAA', 'ABT', 'AGG', 'ACV', 'BMI', 'BMP', 'BSR', 'BWE', 'CII', 'CMG',
-            'CTD', 'DBC', 'DCM', 'DGC', 'DGW', 'DHG', 'DIG', 'DPM', 'DXG', 'EIB',
-            'FLC', 'GMD', 'HAG', 'HCM', 'HDC', 'HNG', 'HPX', 'HSG', 'HT1', 'HTN',
-            'IMP', 'KBC', 'KDC', 'KDH', 'LCG', 'LDG', 'LPB', 'MIG', 'NAB', 'NLG',
-            'NT2', 'NVL', 'OCB', 'OGC', 'PAC', 'PC1', 'PDR', 'PET', 'PGD', 'PHR',
-            'PNJ', 'POM', 'PPC', 'PVD', 'PVT', 'REE', 'ROS', 'SBT', 'SCR', 'SCS',
-            'SHB', 'SJS', 'SKG', 'SSB', 'SSC', 'SZC', 'TDH', 'TLG', 'TNA', 'TNG',
-            'TPH', 'TRA', 'TYA', 'VAB', 'VCG', 'VCI', 'VGC', 'VHC', 'VID', 'VIX',
-            'VND', 'VOS', 'VPI', 'VPG', 'VSC', 'VSH', 'VTO', 'YEG'
+        #     'MBB', 'MSN', 'MWG', 'PLX', 'POW', 'SAB', 'SSI', 'STB', 'TCB', 'TPB',
+        #     'VCB', 'VHM', 'VIB', 'VIC', 'VJC', 'VNM', 'VPB', 'VRE',
+        #     # Additional blue chips
+        #     'AAA', 'ABT', 'AGG', 'ACV', 'BMI', 'BMP', 'BSR', 'BWE', 'CII', 'CMG',
+        #     'CTD', 'DBC', 'DCM', 'DGC', 'DGW', 'DHG', 'DIG', 'DPM', 'DXG', 'EIB',
+        #     'FLC', 'GMD', 'HAG', 'HCM', 'HDC', 'HNG', 'HPX', 'HSG', 'HT1', 'HTN',
+        #     'IMP', 'KBC', 'KDC', 'KDH', 'LCG', 'LDG', 'LPB', 'MIG', 'NAB', 'NLG',
+        #     'NT2', 'NVL', 'OCB', 'OGC', 'PAC', 'PC1', 'PDR', 'PET', 'PGD', 'PHR',
+        #     'PNJ', 'POM', 'PPC', 'PVD', 'PVT', 'REE', 'ROS', 'SBT', 'SCR', 'SCS',
+        #     'SHB', 'SJS', 'SKG', 'SSB', 'SSC', 'SZC', 'TDH', 'TLG', 'TNA', 'TNG',
+        #     'TPH', 'TRA', 'TYA', 'VAB', 'VCG', 'VCI', 'VGC', 'VHC', 'VID', 'VIX',
+        #     'VND', 'VOS', 'VPI', 'VPG', 'VSC', 'VSH', 'VTO', 'YEG'
         ]
         
         successful_stocks = []
@@ -96,57 +98,15 @@ def extract_vnstock_data(**context):
         
         logger.info(f"Processing {len(tickers)} stock tickers...")
         
-        def fetch_with_retry(ticker, date_str, max_retries=MAX_RETRIES):
-            """Fetch stock data với retry và multiple sources"""
-            for attempt in range(max_retries):
-                # Chọn source khác nhau cho mỗi attempt
-                source = SOURCES[attempt % len(SOURCES)]
-                
-                try:
-                    if attempt > 0:
-                        # Exponential backoff với random jitter
-                        delay = RETRY_DELAY * (2 ** attempt) + random.uniform(0, 1)
-                        logger.info(f"    🔄 {ticker}: Retry {attempt + 1}/{max_retries} với {source} sau {delay:.1f}s...")
-                        time.sleep(delay)
-                    
-                    # Fetch data từ source hiện tại
-                    stock = vnstock.stock(symbol=ticker, source=source)
-                    stock_data = stock.quote.history(start=date_str, end=date_str)
-                    
-                    if stock_data is not None and not stock_data.empty:
-                        # Check có đủ columns không
-                        required_cols = ['time', 'open', 'high', 'low', 'close', 'volume']
-                        if not all(col in stock_data.columns for col in required_cols):
-                            logger.warning(f"    ⚠️ {ticker}: Thiếu cột từ {source}")
-                            continue
-                        
-                        logger.info(f"    ✅ {ticker}: Lấy được {len(stock_data)} records từ {source}")
-                        return stock_data, source
-                    else:
-                        logger.warning(f"    ⚠️ {ticker}: Không có dữ liệu từ {source}")
-                        
-                except Exception as e:
-                    error_msg = str(e)
-                    if '403' in error_msg or 'Forbidden' in error_msg:
-                        logger.warning(f"    ⚠️ {ticker}: 403 Forbidden từ {source}")
-                    else:
-                        logger.error(f"    ❌ {ticker}: Lỗi từ {source}: {error_msg}")
-                    
-                    if attempt == max_retries - 1:
-                        logger.error(f"    ❌ {ticker}: Đã thử hết {max_retries} lần với tất cả sources")
-            
-            return None, None
-        
         for ticker in tickers:
             try:
                 logger.info(f"  Processing {ticker}...")
                 
-                # Thêm random delay trước mỗi request
-                delay = REQUEST_DELAY + random.uniform(0, 1.5)
-                time.sleep(delay)
-                
-                # Fetch với retry
-                stock_data, source_used = fetch_with_retry(ticker, date_str)
+                # Fetch stock data from VNStock API
+                stock_data = vnstock.stock(symbol=ticker, source='VCI').quote.history(
+                    start=date_str,
+                    end=date_str
+                )
                 
                 if stock_data is not None and not stock_data.empty:
                     # Convert DataFrame to JSON
@@ -157,7 +117,7 @@ def extract_vnstock_data(**context):
                         'ticker': ticker,
                         'date': date_str,
                         'data': stock_dict,
-                        '_source': f'vnstock_v3_{source_used.lower()}',
+                        '_source': 'vnstock_v3_vci',
                         '_ingested_at_utc': datetime.utcnow().isoformat() + 'Z'
                     }
                     
@@ -180,8 +140,11 @@ def extract_vnstock_data(**context):
                     logger.info(f"    ✅ {ticker}: {len(stock_dict)} records → {s3_key}")
                     
                 else:
-                    logger.warning(f"    ⚠️ {ticker}: Không thể lấy dữ liệu từ bất kỳ source nào")
+                    logger.warning(f"    ⚠️ {ticker}: No data returned")
                     failed_stocks.append(ticker)
+                
+                # Rate limiting (avoid API throttling)
+                time.sleep(2.5)
                 
             except Exception as e:
                 logger.error(f"    ❌ {ticker} failed: {str(e)}")
@@ -220,27 +183,30 @@ def extract_vnstock_data(**context):
             'execution_date': date_str
         }
         
+        log_pipeline_success(logger, metadata, result)
         logger.info(f"✅ Stock Extraction Complete: {result}")
         
         return result
         
     except Exception as e:
-        logger.error(f"💥 Stock extraction failed: {str(e)}")
+        context_data = {
+            'successful_stocks': len(successful_stocks) if 'successful_stocks' in locals() else 0,
+            'failed_stocks': len(failed_stocks) if 'failed_stocks' in locals() else 0
+        }
+        
+        log_pipeline_error(logger, metadata, e, context_data)
         raise
 
 
 def extract_news_data(**context):
     """
-    Extract financial news using web scraping from Vietnamese and international sources
+    Extract financial news from Google Custom Search API
     Output: bronze/news/raw/{id}.json
     """
     try:
         import requests
-        from bs4 import BeautifulSoup
         from airflow.providers.amazon.aws.hooks.s3 import S3Hook
         import hashlib
-        import time
-        import random
         
         execution_date = context['execution_date']
         date_str = execution_date.strftime('%Y-%m-%d')
@@ -248,240 +214,107 @@ def extract_news_data(**context):
         logger = logging.getLogger(__name__)
         logger.info(f"📰 Starting news extraction for {date_str}")
         
+        # Enhanced logger metadata
+        metadata = {
+            'pipeline_name': 'bronze_news_extraction',
+            'layer': 'bronze',
+            'data_type': 'news',
+            'execution_date': date_str
+        }
+        
+        log_pipeline_start(logger, metadata)
+        
         # Initialize S3
         s3_hook = S3Hook(aws_conn_id='aws_default')
         bucket_name = os.getenv('S3_BUCKET', 'bankanalystportfolio')
+        
+        # Google Custom Search API credentials (from environment)
+        api_key = os.getenv('GOOGLE_API_KEY')
+        search_engine_id = os.getenv('GOOGLE_SEARCH_ENGINE_ID')
         
         successful_sources = []
         failed_sources = []
         s3_paths = []
         total_articles = 0
         
-        # User-Agent để tránh bị block
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-            'Accept-Language': 'vi-VN,vi;q=0.9,en-US;q=0.8,en;q=0.7',
-        }
+        # Vietnamese financial news search queries
+        search_queries = [
+            'chứng khoán Việt Nam',
+            'VNINDEX hôm nay',
+            'thị trường tài chính Việt Nam',
+            'cổ phiếu ngân hàng',
+            'bất động sản Việt Nam'
+        ]
         
-        # Các nguồn tin tức uy tín Việt Nam và Thế giới
-        news_sources = {
-            'vnexpress': {
-                'url': 'https://vnexpress.net/kinh-doanh/chung-khoan',
-                'name': 'VnExpress',
-                'country': 'Vietnam',
-                'parser': 'vnexpress'
-            },
-            'cafef': {
-                'url': 'https://cafef.vn/chung-khoan.chn',
-                'name': 'CafeF',
-                'country': 'Vietnam',
-                'parser': 'cafef'
-            },
-            'vietstock': {
-                'url': 'https://vietstock.vn/tai-chinh.htm',
-                'name': 'Vietstock',
-                'country': 'Vietnam',
-                'parser': 'vietstock'
-            },
-            'ndh': {
-                'url': 'https://nhadautu.vn/chung-khoan',
-                'name': 'Nhà Đầu Tư',
-                'country': 'Vietnam',
-                'parser': 'ndh'
-            },
-            'dantri': {
-                'url': 'https://dantri.com.vn/kinh-doanh.htm',
-                'name': 'Dân Trí',
-                'country': 'Vietnam',
-                'parser': 'dantri'
-            }
-        }
-        
-        def scrape_generic_news(url, source_name, parser_type):
-            """Scrape tin tức với generic parser"""
+        for query in search_queries:
             try:
-                logger.info(f"  Scraping {source_name}...")
+                logger.info(f"  Searching: '{query}'...")
                 
-                # Thêm random delay để tránh rate limiting
-                time.sleep(random.uniform(1.0, 3.0))
+                # Google Custom Search API
+                url = "https://www.googleapis.com/customsearch/v1"
+                params = {
+                    'key': api_key,
+                    'cx': search_engine_id,
+                    'q': query,
+                    'dateRestrict': 'd1',  # Last 24 hours
+                    'num': 10
+                }
                 
-                response = requests.get(url, headers=headers, timeout=30)
+                response = requests.get(url, params=params, timeout=30)
                 response.raise_for_status()
-                response.encoding = 'utf-8'
                 
-                soup = BeautifulSoup(response.text, 'html.parser')
-                articles = []
+                search_results = response.json()
+                articles = search_results.get('items', [])
                 
-                # Generic parser - tìm các thẻ article, div với class chứa 'article', 'news', 'item'
-                if parser_type == 'vnexpress':
-                    # VnExpress structure
-                    article_items = soup.find_all('article', class_='item-news')
-                    for item in article_items[:10]:  # Lấy 10 bài mới nhất
-                        try:
-                            title_tag = item.find('h3', class_='title-news') or item.find('h2') or item.find('a')
-                            link_tag = item.find('a', href=True)
-                            desc_tag = item.find('p', class_='description')
-                            
-                            if title_tag and link_tag:
-                                title = title_tag.get_text(strip=True)
-                                link = link_tag['href']
-                                if not link.startswith('http'):
-                                    link = 'https://vnexpress.net' + link
-                                description = desc_tag.get_text(strip=True) if desc_tag else ''
-                                
-                                articles.append({
-                                    'title': title,
-                                    'link': link,
-                                    'description': description
-                                })
-                        except Exception as e:
-                            continue
-                
-                elif parser_type == 'cafef':
-                    # CafeF structure
-                    article_items = soup.find_all('div', class_=['tlitem', 'item'])
-                    for item in article_items[:10]:
-                        try:
-                            title_tag = item.find('h3') or item.find('a')
-                            link_tag = item.find('a', href=True)
-                            desc_tag = item.find('p')
-                            
-                            if title_tag and link_tag:
-                                title = title_tag.get_text(strip=True)
-                                link = link_tag['href']
-                                if not link.startswith('http'):
-                                    link = 'https://cafef.vn' + link
-                                description = desc_tag.get_text(strip=True) if desc_tag else ''
-                                
-                                articles.append({
-                                    'title': title,
-                                    'link': link,
-                                    'description': description
-                                })
-                        except Exception as e:
-                            continue
-                
-                else:
-                    # Generic fallback parser
-                    article_items = soup.find_all(['article', 'div'], class_=lambda x: x and any(
-                        keyword in str(x).lower() for keyword in ['article', 'news', 'item', 'post']
-                    ))[:15]
+                for article in articles:
+                    # Generate unique ID from URL
+                    article_id = hashlib.md5(article['link'].encode()).hexdigest()[:16]
                     
-                    for item in article_items:
-                        try:
-                            # Tìm title
-                            title_tag = item.find(['h1', 'h2', 'h3', 'h4']) or item.find('a')
-                            if not title_tag:
-                                continue
-                            
-                            # Tìm link
-                            link_tag = item.find('a', href=True)
-                            if not link_tag:
-                                continue
-                            
-                            title = title_tag.get_text(strip=True)
-                            link = link_tag['href']
-                            
-                            # Normalize link
-                            if not link.startswith('http'):
-                                from urllib.parse import urljoin
-                                link = urljoin(url, link)
-                            
-                            # Tìm description
-                            desc_tag = item.find('p') or item.find('div', class_=lambda x: x and 'desc' in str(x).lower())
-                            description = desc_tag.get_text(strip=True) if desc_tag else ''
-                            
-                            # Lọc các link hợp lệ
-                            if len(title) > 10 and 'http' in link:
-                                articles.append({
-                                    'title': title,
-                                    'link': link,
-                                    'description': description
-                                })
-                        except Exception as e:
-                            continue
+                    # Create news record
+                    news_record = {
+                        'id': article_id,
+                        'title': article.get('title', ''),
+                        'snippet': article.get('snippet', ''),
+                        'link': article.get('link', ''),
+                        'source': article.get('displayLink', ''),
+                        'published_date': date_str,
+                        'query': query,
+                        '_ingested_at_utc': datetime.utcnow().isoformat() + 'Z'
+                    }
+                    
+                    # Convert to JSON
+                    json_content = json.dumps(news_record, ensure_ascii=False, indent=2)
+                    
+                    # S3 key: bronze/news/raw/{id}.json
+                    s3_key = f"bronze/news/raw/{article_id}.json"
+                    
+                    # Upload to S3
+                    s3_hook.load_string(
+                        string_data=json_content,
+                        key=s3_key,
+                        bucket_name=bucket_name,
+                        replace=True
+                    )
+                    
+                    s3_paths.append(s3_key)
+                    total_articles += 1
                 
-                logger.info(f"    ✅ {source_name}: Found {len(articles)} articles")
-                return articles
+                successful_sources.append(query)
+                logger.info(f"    ✅ '{query}': {len(articles)} articles")
                 
             except Exception as e:
-                logger.error(f"    ❌ {source_name} failed: {str(e)}")
-                return []
-        
-        # Scrape từng nguồn
-        for source_key, source_info in news_sources.items():
-            try:
-                articles = scrape_generic_news(
-                    source_info['url'],
-                    source_info['name'],
-                    source_info['parser']
-                )
-                
-                if articles:
-                    for article in articles:
-                        try:
-                            # Generate unique ID from URL + date to avoid duplicates across days
-                            unique_string = f"{article['link']}_{date_str}"
-                            article_id = hashlib.md5(unique_string.encode()).hexdigest()[:16]
-                            
-                            # Create news record
-                            news_record = {
-                                'id': article_id,
-                                'title': article['title'],
-                                'snippet': article['description'],
-                                'link': article['link'],
-                                'source': source_info['name'],
-                                'country': source_info['country'],
-                                'published_date': date_str,
-                                'extraction_method': 'web_scraping',
-                                '_ingested_at_utc': datetime.utcnow().isoformat() + 'Z'
-                            }
-                            
-                            # Convert to JSON
-                            json_content = json.dumps(news_record, ensure_ascii=False, indent=2)
-                            
-                            # S3 key: bronze/news/raw/{id}.json
-                            s3_key = f"bronze/news/raw/{article_id}.json"
-                            
-                            # Upload to S3
-                            s3_hook.load_string(
-                                string_data=json_content,
-                                key=s3_key,
-                                bucket_name=bucket_name,
-                                replace=True
-                            )
-                            
-                            s3_paths.append(s3_key)
-                            total_articles += 1
-                            
-                            # Log upload (every 5 articles)
-                            if total_articles % 5 == 0 or total_articles == 1:
-                                logger.info(f"    📤 Uploaded {total_articles} articles...")
-                            
-                        except Exception as e:
-                            logger.error(f"    ❌ Error processing article: {str(e)}")
-                            continue
-                    
-                    successful_sources.append(source_info['name'])
-                else:
-                    failed_sources.append(source_info['name'])
-                    
-            except Exception as e:
-                logger.error(f"  ❌ {source_info['name']} scraping failed: {str(e)}")
-                failed_sources.append(source_info['name'])
+                logger.error(f"    ❌ '{query}' failed: {str(e)}")
+                failed_sources.append(query)
         
         # Create metadata
         metadata_summary = {
             'extraction_date': date_str,
-            'total_sources': len(news_sources),
-            'successful_sources': len(successful_sources),
-            'failed_sources': len(failed_sources),
+            'total_queries': len(search_queries),
+            'successful_queries': len(successful_sources),
+            'failed_queries': len(failed_sources),
             'total_articles': total_articles,
-            'sources_processed': successful_sources,
-            'sources_failed': failed_sources,
+            'queries_processed': successful_sources,
             's3_paths': s3_paths,
-            'extraction_method': 'web_scraping_beautifulsoup',
             '_schema_version': '2.0'
         }
         
@@ -499,17 +332,23 @@ def extract_news_data(**context):
         # Result summary
         result = {
             'total_articles': total_articles,
-            'successful_sources': len(successful_sources),
-            'failed_sources': len(failed_sources),
+            'successful_queries': len(successful_sources),
+            'failed_queries': len(failed_sources),
             'execution_date': date_str
         }
         
+        log_pipeline_success(logger, metadata, result)
         logger.info(f"✅ News Extraction Complete: {result}")
         
         return result
         
     except Exception as e:
-        logger.error(f"💥 News extraction failed: {str(e)}")
+        context_data = {
+            'articles_collected': total_articles if 'total_articles' in locals() else 0,
+            'sources_processed': len(successful_sources) if 'successful_sources' in locals() else 0
+        }
+        
+        log_pipeline_error(logger, metadata, e, context_data)
         raise
 
 
@@ -529,6 +368,16 @@ def extract_macro_data(**context):
         
         logger = logging.getLogger(__name__)
         logger.info(f"📊 Starting macro data extraction for {date_str}")
+        
+        # Enhanced logger metadata
+        metadata = {
+            'pipeline_name': 'bronze_macro_extraction',
+            'layer': 'bronze',
+            'data_type': 'macro',
+            'execution_date': date_str
+        }
+        
+        log_pipeline_start(logger, metadata)
         
         # Initialize S3
         s3_hook = S3Hook(aws_conn_id='aws_default')
@@ -682,12 +531,18 @@ def extract_macro_data(**context):
             'execution_date': date_str
         }
         
+        log_pipeline_success(logger, metadata, result)
         logger.info(f"✅ Macro Extraction Complete: {result}")
         
         return result
         
     except Exception as e:
-        logger.error(f"💥 Macro extraction failed: {str(e)}")
+        context_data = {
+            'indicators_processed': len(indicators_processed) if 'indicators_processed' in locals() else 0,
+            'files_uploaded': len(s3_paths) if 's3_paths' in locals() else 0
+        }
+        
+        log_pipeline_error(logger, metadata, e, context_data)
         raise
 
 

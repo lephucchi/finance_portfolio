@@ -1,11 +1,13 @@
 """
-Silver Layer Pipeline - Production Ready
+Silver Layer Pipeline (Aligned with S3_LAKEHOUSE_COMPLETE_STRUCTURE.md)
 =========================================================================
-Process Bronze layer data from TODAY and write to Silver layer with:
+
+This DAG processes Bronze layer data and writes to Silver layer with:
+- Batch processing (500 files per batch)
 - Parquet format with Snappy compression
 - Hive-style partitioning: partition_date=YYYY-MM-DD
-- Standard Python logging (no enhanced_logger dependency)
-- Only processes data from execution date (no historical backfill)
+- Concurrent file reading (10 workers)
+- Schema validation and data quality checks
 
 Schedule: Daily at 7 AM (weekdays), after Bronze layer
 Dependencies: pandas, pyarrow, boto3
@@ -18,15 +20,12 @@ import logging
 import json
 import os
 import pandas as pd
+import numpy as np
 import pyarrow as pa
 import pyarrow.parquet as pq
-import boto3
-import io
-import sys
-
-# Import sentiment analyzer
-sys.path.append('/opt/airflow/dags')
-from utils.sentiment_analyzer import calculate_sentiment_score, classify_sentiment
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import threading
+from enhanced_logger import log_pipeline_start, log_pipeline_success, log_pipeline_error
 
 # Default arguments
 default_args = {
@@ -35,16 +34,16 @@ default_args = {
     'start_date': datetime(2024, 1, 1),
     'email_on_failure': True,
     'email_on_retry': False,
-    'retries': 2,
+    'retries': 3,
     'retry_delay': timedelta(minutes=5),
-    'execution_timeout': timedelta(hours=2),
+    'execution_timeout': timedelta(hours=3),
 }
 
 # DAG definition
 dag = DAG(
     'silver_layer_pipeline',
     default_args=default_args,
-    description='Silver layer data processing (Bronze → Parquet)',
+    description='Silver layer data processing (Bronze → Parquet + partitioning)',
     schedule_interval='0 7 * * 1-5',  # 7 AM weekdays
     catchup=False,
     tags=['silver', 'lakehouse', 'parquet'],
@@ -54,29 +53,40 @@ dag = DAG(
 
 def process_stock_data(**context):
     """
-    Process stock data from Bronze (today only)
-    Input: bronze/stocks/raw/{ticker}_{date}.json
+    Process stock data with batch reading and Parquet output
+    Input: bronze/stocks/raw/{ticker}_{date}.json (flat structure)
     Output: silver/stocks/partition_date=YYYY-MM-DD/stock_data.parquet
     """
-    logger = logging.getLogger(__name__)
-    
     try:
+        from airflow.providers.amazon.aws.hooks.s3 import S3Hook
+        import io
+        
         execution_date = context['execution_date']
         date_str = execution_date.strftime('%Y-%m-%d')
         
-        logger.info(f"📈 Processing stocks for {date_str}")
+        logger = logging.getLogger(__name__)
+        logger.info(f"📈 Starting stock data processing for {date_str}")
         
-        # S3 setup
-        s3 = boto3.client('s3')
-        bucket = os.getenv('S3_BUCKET', 'bankanalystportfolio')
+        # Enhanced logger metadata
+        metadata = {
+            'pipeline_name': 'silver_stock_processing',
+            'layer': 'silver',
+            'data_type': 'stocks',
+            'execution_date': date_str
+        }
         
-        # List Bronze stock files for TODAY only
-        logger.info(f"📂 Listing Bronze stock files for {date_str}...")
-        paginator = s3.get_paginator('list_objects_v2')
-        pages = paginator.paginate(Bucket=bucket, Prefix=f'bronze/stocks/raw/')
+        log_pipeline_start(logger, metadata)
         
+        # Initialize S3
+        s3_hook = S3Hook(aws_conn_id='aws_default')
+        bucket_name = os.getenv('S3_BUCKET', 'bankanalystportfolio')
+        s3_client = s3_hook.get_conn()
+        
+        # List all stock files for today
+        logger.info(f"📂 Listing Bronze stock files...")
         stock_files = []
-        for page in pages:
+        paginator = s3_client.get_paginator('list_objects_v2')
+        for page in paginator.paginate(Bucket=bucket_name, Prefix=f"bronze/stocks/raw/"):
             if 'Contents' in page:
                 for obj in page['Contents']:
                     if obj['Key'].endswith('.json') and date_str in obj['Key']:
@@ -84,330 +94,677 @@ def process_stock_data(**context):
         
         if not stock_files:
             logger.warning(f"⚠️ No stock files found for {date_str}")
-            return {'status': 'no_data', 'date': date_str, 'files': 0}
+            result = {'stocks_processed': 0, 'execution_date': date_str}
+            log_pipeline_success(logger, metadata, result)
+            return result
         
         logger.info(f"📊 Found {len(stock_files)} stock files")
         
-        # Read and combine all files
-        all_records = []
-        errors = 0
-        
-        for key in stock_files:
+        # Concurrent file reading (10 workers, batches of 500)
+        def read_single_stock_file(key):
             try:
-                obj = s3.get_object(Bucket=bucket, Key=key)
-                data = json.loads(obj['Body'].read().decode('utf-8'))
+                obj = s3_client.get_object(Bucket=bucket_name, Key=key)
+                content = obj['Body'].read(amt=1024*1024*10).decode('utf-8')
+                data = json.loads(content)
                 
+                # Extract ticker and data
                 ticker = data.get('ticker', '')
-                for record in data.get('data', []):
+                stock_data = data.get('data', [])
+                
+                if not stock_data:
+                    return None
+                
+                # Convert to records with ticker
+                records = []
+                for record in stock_data:
                     record['ticker'] = ticker
                     record['_source'] = data.get('_source', 'vnstock_v3')
-                    all_records.append(record)
+                    record['_ingest_time'] = data.get('_ingested_at_utc', '')
+                    records.append(record)
+                
+                return records
+                
             except Exception as e:
-                errors += 1
-                logger.error(f"Error reading {key}: {e}")
+                logger.error(f"  ❌ Error reading {key}: {str(e)}")
+                return None
+        
+        # Process in batches of 500 files
+        BATCH_SIZE = 500
+        all_records = []
+        
+        for i in range(0, len(stock_files), BATCH_SIZE):
+            batch_files = stock_files[i:i+BATCH_SIZE]
+            logger.info(f"📦 Processing batch {i//BATCH_SIZE + 1}/{(len(stock_files)-1)//BATCH_SIZE + 1} ({len(batch_files)} files)...")
+            
+            with ThreadPoolExecutor(max_workers=10) as executor:
+                futures = {executor.submit(read_single_stock_file, key): key for key in batch_files}
+                
+                for future in as_completed(futures):
+                    result = future.result()
+                    if result:
+                        all_records.extend(result)
         
         if not all_records:
-            logger.warning("⚠️ No valid records extracted")
-            return {'status': 'no_records', 'date': date_str, 'files': len(stock_files), 'errors': errors}
+            logger.warning(f"⚠️ No valid stock records after processing")
+            result = {'stocks_processed': 0, 'execution_date': date_str}
+            log_pipeline_success(logger, metadata, result)
+            return result
         
-        logger.info(f"📦 Processing {len(all_records)} records from {len(stock_files)} files ({errors} errors)")
+        logger.info(f"📝 Loaded {len(all_records)} stock records")
         
-        # Convert to DataFrame
+        # Create DataFrame
         df = pd.DataFrame(all_records)
+        
+        # Clean and standardize
+        logger.info(f"🧹 Cleaning and standardizing data...")
+        
+        # Rename columns
+        df.rename(columns={
+            'ticker': 'symbol',
+            'date': 'data_date',
+            '_ingest_time': '_ingested_at_utc'
+        }, inplace=True)
+        
+        # Ensure data types
+        df['symbol'] = df['symbol'].astype(str).str.upper()
+        df['data_date'] = pd.to_datetime(df['data_date']).dt.strftime('%Y-%m-%d')
+        
+        numeric_cols = ['open', 'high', 'low', 'close', 'volume']
+        for col in numeric_cols:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors='coerce')
+        
+        # Fill volume NaN with 0
+        if 'volume' in df.columns:
+            df['volume'] = df['volume'].fillna(0).astype(int)
+        
+        # Calculate technical indicators
+        df['price_change'] = df['close'] - df['open']
+        df['price_change_pct'] = ((df['close'] - df['open']) / df['open'] * 100).round(4)
+        
+        # Drop duplicates
+        df = df.drop_duplicates(subset=['symbol', 'data_date'], keep='last')
+        
+        # Remove rows with missing critical data
+        df = df.dropna(subset=['symbol', 'data_date', 'close'])
+        
+        # Select columns for Silver layer
+        silver_cols = ['symbol', 'data_date', 'open', 'high', 'low', 'close', 'volume',
+                       'price_change', 'price_change_pct', '_source', '_ingested_at_utc']
+        df = df[[col for col in silver_cols if col in df.columns]]
+        
+        # Sort by symbol and date
+        df = df.sort_values(['symbol', 'data_date']).reset_index(drop=True)
+        
+        logger.info(f"✅ Cleaned data: {len(df)} records, {df['symbol'].nunique()} unique symbols")
+        
+        # Add partition_date column
         df['partition_date'] = date_str
         
-        # Write Parquet to S3
-        table = pa.Table.from_pandas(df)
-        output_key = f'silver/stocks/partition_date={date_str}/stock_data.parquet'
+        # Convert to Parquet and upload
+        logger.info(f"💾 Writing Parquet file to S3...")
         
-        buf = io.BytesIO()
-        pq.write_table(table, buf, compression='snappy')
-        buf.seek(0)
+        parquet_buffer = io.BytesIO()
+        df.to_parquet(
+            parquet_buffer,
+            engine='pyarrow',
+            compression='snappy',
+            index=False
+        )
         
-        s3.put_object(Bucket=bucket, Key=output_key, Body=buf.getvalue())
+        # S3 key with partition
+        s3_key = f"silver/stocks/partition_date={date_str}/stock_data.parquet"
         
-        parquet_size = len(buf.getvalue()) / 1024
-        logger.info(f"✅ SUCCESS: {len(all_records)} records → {output_key}")
-        logger.info(f"   Parquet size: {parquet_size:.1f} KB | Tickers: {df['ticker'].nunique()}")
+        s3_hook.load_bytes(
+            bytes_data=parquet_buffer.getvalue(),
+            key=s3_key,
+            bucket_name=bucket_name,
+            replace=True
+        )
         
-        return {
-            'status': 'success',
-            'date': date_str,
-            'files_read': len(stock_files),
-            'records': len(all_records),
-            'tickers': int(df['ticker'].nunique()),
-            'output': output_key,
-            'size_kb': round(parquet_size, 1),
-            'errors': errors
+        logger.info(f"✅ Uploaded {s3_key}")
+        
+        # Create metadata
+        metadata_summary = {
+            'processing_date': date_str,
+            'partition_date': date_str,
+            'total_records': len(df),
+            'unique_symbols': int(df['symbol'].nunique()),
+            'data_date_range': {
+                'min': str(df['data_date'].min()),
+                'max': str(df['data_date'].max())
+            },
+            'schema_info': {
+                'columns': list(df.columns),
+                'dtypes': {col: str(dtype) for col, dtype in df.dtypes.items()}
+            },
+            'quality_metrics': {
+                'null_counts': df.isnull().sum().to_dict(),
+                'avg_volume': float(df['volume'].mean()) if 'volume' in df.columns else 0,
+                'avg_price': float(df['close'].mean()) if 'close' in df.columns else 0
+            },
+            'file_info': {
+                's3_key': s3_key,
+                'format': 'parquet',
+                'compression': 'snappy',
+                'size_bytes': len(parquet_buffer.getvalue())
+            },
+            '_schema_version': '2.0'
         }
         
+        # Upload metadata
+        metadata_key = f"silver/stocks/partition_date={date_str}/_metadata.json"
+        s3_hook.load_string(
+            string_data=json.dumps(metadata_summary, indent=2),
+            key=metadata_key,
+            bucket_name=bucket_name,
+            replace=True
+        )
+        
+        logger.info(f"📄 Metadata uploaded to {metadata_key}")
+        
+        # Result summary
+        result = {
+            'stocks_processed': len(df),
+            'unique_symbols': int(df['symbol'].nunique()),
+            'partition_date': date_str,
+            'execution_date': date_str
+        }
+        
+        log_pipeline_success(logger, metadata, result)
+        logger.info(f"✅ Stock Processing Complete: {result}")
+        
+        return result
+        
     except Exception as e:
-        logger.error(f"💥 STOCK PROCESSING FAILED: {e}")
-        import traceback
-        traceback.print_exc()
+        context_data = {
+            'files_found': len(stock_files) if 'stock_files' in locals() else 0,
+            'records_processed': len(df) if 'df' in locals() else 0
+        }
+        
+        log_pipeline_error(logger, metadata, e, context_data)
         raise
 
 
 def process_news_data(**context):
     """
-    Process news data from Bronze (recent files only)
+    Process news data with flexible date parsing
     Input: bronze/news/raw/{id}.json
     Output: silver/news/partition_date=YYYY-MM-DD/news_cleaned.parquet
     """
-    logger = logging.getLogger(__name__)
-    
     try:
+        from airflow.providers.amazon.aws.hooks.s3 import S3Hook
+        import io
+        
         execution_date = context['execution_date']
         date_str = execution_date.strftime('%Y-%m-%d')
         
-        logger.info(f"📰 Processing news for {date_str}")
+        logger = logging.getLogger(__name__)
+        logger.info(f"📰 Starting news data processing for {date_str}")
         
-        # S3 setup
-        s3 = boto3.client('s3')
-        bucket = os.getenv('S3_BUCKET', 'bankanalystportfolio')
+        # Enhanced logger metadata
+        metadata = {
+            'pipeline_name': 'silver_news_processing',
+            'layer': 'silver',
+            'data_type': 'news',
+            'execution_date': date_str
+        }
         
-        # List Bronze news files (filter by modification time)
-        logger.info(f"📂 Listing recent Bronze news files...")
-        paginator = s3.get_paginator('list_objects_v2')
-        pages = paginator.paginate(Bucket=bucket, Prefix=f'bronze/news/raw/')
+        log_pipeline_start(logger, metadata)
         
-        # Get files modified in last 24 hours
-        cutoff_time = execution_date - timedelta(hours=24)
-        recent_files = []
+        # Initialize S3
+        s3_hook = S3Hook(aws_conn_id='aws_default')
+        bucket_name = os.getenv('S3_BUCKET', 'bankanalystportfolio')
+        s3_client = s3_hook.get_conn()
         
-        for page in pages:
+        # List all news files
+        logger.info(f"📂 Listing Bronze news files...")
+        news_files = []
+        paginator = s3_client.get_paginator('list_objects_v2')
+        for page in paginator.paginate(Bucket=bucket_name, Prefix=f"bronze/news/raw/"):
             if 'Contents' in page:
                 for obj in page['Contents']:
-                    if obj['Key'].endswith('.json') and obj['LastModified'] >= cutoff_time:
-                        recent_files.append(obj['Key'])
+                    if obj['Key'].endswith('.json'):
+                        # Check if file was created today (or get all for now)
+                        news_files.append(obj['Key'])
         
-        if not recent_files:
-            logger.warning(f"⚠️ No recent news files found")
-            return {'status': 'no_data', 'date': date_str, 'files': 0}
+        if not news_files:
+            logger.warning(f"⚠️ No news files found")
+            result = {'news_processed': 0, 'execution_date': date_str}
+            log_pipeline_success(logger, metadata, result)
+            return result
         
-        logger.info(f"📊 Found {len(recent_files)} recent news files")
+        logger.info(f"📊 Found {len(news_files)} news files")
         
-        # Read and combine with content and sentiment
-        all_records = []
-        errors = 0
-        
-        for key in recent_files:
+        # Concurrent file reading
+        def read_single_news_file(key):
             try:
-                obj = s3.get_object(Bucket=bucket, Key=key)
-                data = json.loads(obj['Body'].read().decode('utf-8'))
-                
-                # Extract content (combined_text or title)
-                content = data.get('combined_text', '') or data.get('title', '')
-                title = data.get('title', '')
-                
-                # Calculate sentiment score
-                full_text = f"{title} {content}"
-                sentiment_score = calculate_sentiment_score(full_text)
-                sentiment_category = classify_sentiment(sentiment_score)
-                
-                record = {
-                    'title': title,
-                    'content': content[:500] if content else '',  # Limit to 500 chars
-                    'link': data.get('link', ''),
-                    'source': data.get('source', ''),
-                    'published_date': data.get('published_date', ''),
-                    'extraction_method': data.get('extraction_method', ''),
-                    'sentiment_score': sentiment_score,
-                    'sentiment_category': sentiment_category,
-                }
-                all_records.append(record)
+                obj = s3_client.get_object(Bucket=bucket_name, Key=key)
+                content = obj['Body'].read(amt=1024*1024*5).decode('utf-8')
+                data = json.loads(content)
+                return data
             except Exception as e:
-                errors += 1
-                logger.error(f"Error reading {key}: {e}")
+                return None
+        
+        all_records = []
+        
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            futures = {executor.submit(read_single_news_file, key): key for key in news_files}
+            
+            for future in as_completed(futures):
+                result = future.result()
+                if result:
+                    all_records.append(result)
         
         if not all_records:
-            logger.warning("⚠️ No valid news records")
-            return {'status': 'no_records', 'date': date_str, 'files': len(recent_files), 'errors': errors}
+            logger.warning(f"⚠️ No valid news records")
+            result = {'news_processed': 0, 'execution_date': date_str}
+            log_pipeline_success(logger, metadata, result)
+            return result
         
-        logger.info(f"📦 Processing {len(all_records)} news records ({errors} errors)")
+        logger.info(f"📝 Loaded {len(all_records)} news records")
         
-        # Convert to DataFrame
+        # Create DataFrame
         df = pd.DataFrame(all_records)
+        
+        # Flexible date parsing (handles 8+ formats)
+        def parse_date_flexible(date_val):
+            if pd.isna(date_val):
+                return date_str
+            
+            date_str_val = str(date_val).strip()
+            
+            # Try multiple formats
+            formats = [
+                'ISO8601',
+                '%Y-%m-%d %H:%M:%S.%f',
+                '%Y-%m-%d %H:%M:%S',
+                '%Y-%m-%d',
+                '%d/%m/%Y',
+                '%m/%d/%Y',
+                '%Y%m%d'
+            ]
+            
+            for fmt in formats:
+                try:
+                    if fmt == 'ISO8601':
+                        dt = pd.to_datetime(date_str_val, format='ISO8601', utc=True)
+                    else:
+                        dt = pd.to_datetime(date_str_val, format=fmt, utc=True)
+                    return dt.strftime('%Y-%m-%d')
+                except:
+                    continue
+            
+            # Fallback
+            try:
+                dt = pd.to_datetime(date_str_val, utc=True)
+                return dt.strftime('%Y-%m-%d')
+            except:
+                return date_str
+        
+        # Apply date parsing
+        if 'published_date' in df.columns:
+            df['data_date'] = df['published_date'].apply(parse_date_flexible)
+        else:
+            df['data_date'] = date_str
+        
+        # Clean text fields
+        if 'snippet' in df.columns and 'title' not in df.columns:
+            df['title'] = df['snippet']
+        
+        if 'snippet' in df.columns:
+            df['content'] = df['snippet']
+        else:
+            df['content'] = ''
+        
+        df['content'] = df['content'].fillna('').astype(str)
+        
+        # Remove empty content
+        df = df[df['content'].str.len() > 0]
+        
+        # Drop duplicates by id
+        if 'id' in df.columns:
+            df = df.drop_duplicates(subset=['id'], keep='last')
+        
+        # Select columns
+        silver_cols = ['id', 'data_date', 'source', 'title', 'content', 'link', '_ingested_at_utc']
+        df = df[[col for col in silver_cols if col in df.columns]]
+        
+        df = df.sort_values('data_date').reset_index(drop=True)
+        
+        logger.info(f"✅ Cleaned data: {len(df)} news articles")
+        
+        # Add partition_date
         df['partition_date'] = date_str
         
         # Write Parquet
-        table = pa.Table.from_pandas(df)
-        output_key = f'silver/news/partition_date={date_str}/news_cleaned.parquet'
+        logger.info(f"💾 Writing Parquet file...")
         
-        buf = io.BytesIO()
-        pq.write_table(table, buf, compression='snappy')
-        buf.seek(0)
+        parquet_buffer = io.BytesIO()
+        df.to_parquet(
+            parquet_buffer,
+            engine='pyarrow',
+            compression='snappy',
+            index=False
+        )
         
-        s3.put_object(Bucket=bucket, Key=output_key, Body=buf.getvalue())
+        s3_key = f"silver/news/partition_date={date_str}/news_cleaned.parquet"
         
-        parquet_size = len(buf.getvalue()) / 1024
-        logger.info(f"✅ SUCCESS: {len(all_records)} records → {output_key}")
-        logger.info(f"   Parquet size: {parquet_size:.1f} KB | Sources: {df['source'].nunique()}")
-        logger.info(f"   Sentiment: avg={df['sentiment_score'].mean():.2f}, positive={len(df[df['sentiment_score']>0])}, negative={len(df[df['sentiment_score']<0])}")
+        s3_hook.load_bytes(
+            bytes_data=parquet_buffer.getvalue(),
+            key=s3_key,
+            bucket_name=bucket_name,
+            replace=True
+        )
         
-        return {
-            'status': 'success',
-            'date': date_str,
-            'files_read': len(recent_files),
-            'records': len(all_records),
-            'sources': int(df['source'].nunique()),
-            'output': output_key,
-            'size_kb': round(parquet_size, 1),
-            'errors': errors,
-            'avg_sentiment': round(df['sentiment_score'].mean(), 2)
+        logger.info(f"✅ Uploaded {s3_key}")
+        
+        # Metadata
+        metadata_summary = {
+            'processing_date': date_str,
+            'partition_date': date_str,
+            'total_records': len(df),
+            'unique_sources': int(df['source'].nunique()) if 'source' in df.columns else 0,
+            'schema_info': {
+                'columns': list(df.columns),
+                'dtypes': {col: str(dtype) for col, dtype in df.dtypes.items()}
+            },
+            'quality_metrics': {
+                'avg_content_length': float(df['content'].str.len().mean()) if 'content' in df.columns else 0,
+                'null_counts': df.isnull().sum().to_dict()
+            },
+            'file_info': {
+                's3_key': s3_key,
+                'format': 'parquet',
+                'compression': 'snappy'
+            },
+            '_schema_version': '2.0'
         }
         
+        metadata_key = f"silver/news/partition_date={date_str}/_metadata.json"
+        s3_hook.load_string(
+            string_data=json.dumps(metadata_summary, indent=2),
+            key=metadata_key,
+            bucket_name=bucket_name,
+            replace=True
+        )
+        
+        result = {
+            'news_processed': len(df),
+            'partition_date': date_str,
+            'execution_date': date_str
+        }
+        
+        log_pipeline_success(logger, metadata, result)
+        logger.info(f"✅ News Processing Complete: {result}")
+        
+        return result
+        
     except Exception as e:
-        logger.error(f"💥 NEWS PROCESSING FAILED: {e}")
-        import traceback
-        traceback.print_exc()
+        context_data = {
+            'files_found': len(news_files) if 'news_files' in locals() else 0,
+            'records_processed': len(df) if 'df' in locals() else 0
+        }
+        
+        log_pipeline_error(logger, metadata, e, context_data)
         raise
 
 
 def process_macro_data(**context):
     """
-    Process macro data from Bronze (all indicators)
+    Process macro economic data from 50+ CSV files
     Input: bronze/macro/raw/{category}/{indicator}.csv
     Output: silver/macro/partition_date=YYYY-MM-DD/macro_data.parquet
     """
-    logger = logging.getLogger(__name__)
-    
     try:
+        from airflow.providers.amazon.aws.hooks.s3 import S3Hook
+        import io
+        
         execution_date = context['execution_date']
         date_str = execution_date.strftime('%Y-%m-%d')
         
-        logger.info(f"📊 Processing macro for {date_str}")
+        logger = logging.getLogger(__name__)
+        logger.info(f"📊 Starting macro data processing for {date_str}")
         
-        # S3 setup
-        s3 = boto3.client('s3')
-        bucket = os.getenv('S3_BUCKET', 'bankanalystportfolio')
+        # Enhanced logger metadata
+        metadata = {
+            'pipeline_name': 'silver_macro_processing',
+            'layer': 'silver',
+            'data_type': 'macro',
+            'execution_date': date_str
+        }
         
-        # List Bronze macro files (all CSV files)
+        log_pipeline_start(logger, metadata)
+        
+        # Initialize S3
+        s3_hook = S3Hook(aws_conn_id='aws_default')
+        bucket_name = os.getenv('S3_BUCKET', 'bankanalystportfolio')
+        s3_client = s3_hook.get_conn()
+        
+        # List all macro CSV files
         logger.info(f"📂 Listing Bronze macro files...")
-        paginator = s3.get_paginator('list_objects_v2')
-        pages = paginator.paginate(Bucket=bucket, Prefix=f'bronze/macro/raw/')
-        
-        csv_files = []
-        for page in pages:
+        macro_files = []
+        paginator = s3_client.get_paginator('list_objects_v2')
+        for page in paginator.paginate(Bucket=bucket_name, Prefix=f"bronze/macro/raw/"):
             if 'Contents' in page:
                 for obj in page['Contents']:
                     if obj['Key'].endswith('.csv'):
-                        csv_files.append(obj['Key'])
+                        macro_files.append(obj['Key'])
         
-        if not csv_files:
-            logger.warning(f"⚠️ No macro CSV files found")
-            return {'status': 'no_data', 'date': date_str, 'files': 0}
+        if not macro_files:
+            logger.warning(f"⚠️ No macro files found")
+            result = {'macro_indicators_processed': 0, 'execution_date': date_str}
+            log_pipeline_success(logger, metadata, result)
+            return result
         
-        logger.info(f"📊 Found {len(csv_files)} macro CSV files")
+        logger.info(f"📊 Found {len(macro_files)} macro CSV files")
         
-        # Read and combine all CSVs
-        all_dfs = []
-        errors = 0
+        # Read all CSVs and merge
+        all_data = []
         
-        for key in csv_files:
+        for key in macro_files:
             try:
-                obj = s3.get_object(Bucket=bucket, Key=key)
-                df_temp = pd.read_csv(io.BytesIO(obj['Body'].read()))
-                
-                # Extract indicator name and category from path
+                # Extract category and indicator from path
+                # Path format: bronze/macro/raw/{category}/{indicator}.csv
                 parts = key.split('/')
-                indicator_name = parts[-1].replace('.csv', '')
-                category = parts[-2] if len(parts) > 3 else 'unknown'
+                if len(parts) >= 5:
+                    category = parts[3]
+                    indicator = parts[4].replace('.csv', '')
+                else:
+                    category = 'unknown'
+                    indicator = 'unknown'
                 
-                df_temp['indicator'] = indicator_name
-                df_temp['category'] = category
+                # Read CSV
+                obj = s3_client.get_object(Bucket=bucket_name, Key=key)
+                df_macro = pd.read_csv(io.BytesIO(obj['Body'].read()))
                 
-                all_dfs.append(df_temp)
+                # Add category and indicator columns
+                df_macro['category'] = category
+                df_macro['indicator_name'] = indicator
+                
+                all_data.append(df_macro)
+                logger.info(f"  ✅ {category}/{indicator}: {len(df_macro)} rows")
+                
             except Exception as e:
-                errors += 1
-                logger.error(f"Error reading {key}: {e}")
+                logger.error(f"  ❌ Failed to read {key}: {str(e)}")
         
-        if not all_dfs:
-            logger.warning("⚠️ No valid macro records")
-            return {'status': 'no_records', 'date': date_str, 'files': len(csv_files), 'errors': errors}
+        if not all_data:
+            logger.warning(f"⚠️ No valid macro data")
+            result = {'macro_indicators_processed': 0, 'execution_date': date_str}
+            log_pipeline_success(logger, metadata, result)
+            return result
         
-        # Combine all dataframes
-        df = pd.concat(all_dfs, ignore_index=True)
+        # Merge all dataframes
+        df = pd.concat(all_data, ignore_index=True)
+        
+        logger.info(f"📝 Merged {len(df)} macro records from {len(all_data)} indicators")
+        
+        # Standardize schema
+        if 'date' in df.columns:
+            df['data_date'] = pd.to_datetime(df['date']).dt.strftime('%Y-%m-%d')
+        else:
+            df['data_date'] = date_str
+        
+        # Ensure value column
+        if 'value' in df.columns:
+            df['indicator_value'] = pd.to_numeric(df['value'], errors='coerce')
+        else:
+            df['indicator_value'] = 0.0
+        
+        # Select columns
+        silver_cols = ['data_date', 'category', 'indicator_name', 'indicator_value']
+        df = df[[col for col in silver_cols if col in df.columns]]
+        
+        # Drop duplicates
+        df = df.drop_duplicates(subset=['data_date', 'category', 'indicator_name'], keep='last')
+        
+        # Remove rows with missing data
+        df = df.dropna(subset=['data_date', 'indicator_name'])
+        
+        df = df.sort_values(['category', 'indicator_name', 'data_date']).reset_index(drop=True)
+        
+        logger.info(f"✅ Cleaned data: {len(df)} records, {df['indicator_name'].nunique()} indicators")
+        
+        # Add partition_date
         df['partition_date'] = date_str
         
-        logger.info(f"📦 Processing {len(df)} macro records from {len(csv_files)} indicators ({errors} errors)")
-        
         # Write Parquet
-        table = pa.Table.from_pandas(df)
-        output_key = f'silver/macro/partition_date={date_str}/macro_data.parquet'
+        logger.info(f"💾 Writing Parquet file...")
         
-        buf = io.BytesIO()
-        pq.write_table(table, buf, compression='snappy')
-        buf.seek(0)
+        parquet_buffer = io.BytesIO()
+        df.to_parquet(
+            parquet_buffer,
+            engine='pyarrow',
+            compression='snappy',
+            index=False
+        )
         
-        s3.put_object(Bucket=bucket, Key=output_key, Body=buf.getvalue())
+        s3_key = f"silver/macro/partition_date={date_str}/macro_data.parquet"
         
-        parquet_size = len(buf.getvalue()) / 1024
-        logger.info(f"✅ SUCCESS: {len(df)} records → {output_key}")
-        logger.info(f"   Parquet size: {parquet_size:.1f} KB | Indicators: {df['indicator'].nunique()}")
+        s3_hook.load_bytes(
+            bytes_data=parquet_buffer.getvalue(),
+            key=s3_key,
+            bucket_name=bucket_name,
+            replace=True
+        )
         
-        return {
-            'status': 'success',
-            'date': date_str,
-            'files_read': len(csv_files),
-            'records': len(df),
-            'indicators': int(df['indicator'].nunique()),
-            'output': output_key,
-            'size_kb': round(parquet_size, 1),
-            'errors': errors
+        logger.info(f"✅ Uploaded {s3_key}")
+        
+        # Metadata
+        metadata_summary = {
+            'processing_date': date_str,
+            'partition_date': date_str,
+            'total_records': len(df),
+            'unique_indicators': int(df['indicator_name'].nunique()),
+            'categories': df['category'].value_counts().to_dict(),
+            'schema_info': {
+                'columns': list(df.columns),
+                'dtypes': {col: str(dtype) for col, dtype in df.dtypes.items()}
+            },
+            'quality_metrics': {
+                'avg_value': float(df['indicator_value'].mean()),
+                'null_counts': df.isnull().sum().to_dict()
+            },
+            'file_info': {
+                's3_key': s3_key,
+                'format': 'parquet',
+                'compression': 'snappy'
+            },
+            '_schema_version': '2.0'
         }
         
+        metadata_key = f"silver/macro/partition_date={date_str}/_metadata.json"
+        s3_hook.load_string(
+            string_data=json.dumps(metadata_summary, indent=2),
+            key=metadata_key,
+            bucket_name=bucket_name,
+            replace=True
+        )
+        
+        result = {
+            'macro_indicators_processed': int(df['indicator_name'].nunique()),
+            'total_records': len(df),
+            'partition_date': date_str,
+            'execution_date': date_str
+        }
+        
+        log_pipeline_success(logger, metadata, result)
+        logger.info(f"✅ Macro Processing Complete: {result}")
+        
+        return result
+        
     except Exception as e:
-        logger.error(f"💥 MACRO PROCESSING FAILED: {e}")
-        import traceback
-        traceback.print_exc()
+        context_data = {
+            'files_found': len(macro_files) if 'macro_files' in locals() else 0,
+            'records_processed': len(df) if 'df' in locals() else 0
+        }
+        
+        log_pipeline_error(logger, metadata, e, context_data)
         raise
 
 
 def validate_silver_data(**context):
-    """Validate Silver layer Parquet outputs exist"""
-    logger = logging.getLogger(__name__)
-    
+    """Validate Silver layer Parquet outputs"""
     try:
+        from airflow.providers.amazon.aws.hooks.s3 import S3Hook
+        
+        s3_hook = S3Hook(aws_conn_id='aws_default')
+        bucket_name = os.getenv('S3_BUCKET', 'bankanalystportfolio')
+        
         execution_date = context['execution_date']
         date_str = execution_date.strftime('%Y-%m-%d')
         
-        logger.info(f"🔍 Validating Silver data for {date_str}")
-        
-        s3 = boto3.client('s3')
-        bucket = os.getenv('S3_BUCKET', 'bankanalystportfolio')
+        logger = logging.getLogger(__name__)
+        logger.info(f"🔍 Starting Silver data validation for {date_str}")
         
         validation_results = {
-            'date': date_str,
-            'stocks': {'exists': False, 'size_kb': 0},
-            'news': {'exists': False, 'size_kb': 0},
-            'macro': {'exists': False, 'size_kb': 0},
+            'stocks_validation': {'passed': True, 'issues': []},
+            'news_validation': {'passed': True, 'issues': []},
+            'macro_validation': {'passed': True, 'issues': []},
         }
         
-        # Check each data type
-        for data_type in ['stocks', 'news', 'macro']:
-            key = f"silver/{data_type}/partition_date={date_str}/"
-            try:
-                resp = s3.list_objects_v2(Bucket=bucket, Prefix=key, MaxKeys=10)
-                if 'Contents' in resp:
-                    parquet_files = [obj for obj in resp['Contents'] if obj['Key'].endswith('.parquet')]
-                    if parquet_files:
-                        validation_results[data_type]['exists'] = True
-                        validation_results[data_type]['size_kb'] = round(sum(obj['Size'] for obj in parquet_files) / 1024, 1)
-                        logger.info(f"  ✅ {data_type}: {len(parquet_files)} file(s), {validation_results[data_type]['size_kb']} KB")
-                    else:
-                        logger.warning(f"  ⚠️ {data_type}: No parquet files found")
-                else:
-                    logger.warning(f"  ⚠️ {data_type}: Directory not found")
-            except Exception as e:
-                logger.error(f"  ❌ {data_type}: Validation error - {e}")
+        # Validate stocks
+        try:
+            stock_key = f"silver/stocks/partition_date={date_str}/stock_data.parquet"
+            if s3_hook.check_for_key(key=stock_key, bucket_name=bucket_name):
+                logger.info(f"  ✅ Stocks Parquet found: {stock_key}")
+            else:
+                validation_results['stocks_validation']['passed'] = False
+                validation_results['stocks_validation']['issues'].append('Parquet file not found')
+        except Exception as e:
+            validation_results['stocks_validation']['passed'] = False
+            validation_results['stocks_validation']['issues'].append(str(e))
         
-        logger.info(f"✅ Validation Complete")
+        # Validate news
+        try:
+            news_key = f"silver/news/partition_date={date_str}/news_cleaned.parquet"
+            if s3_hook.check_for_key(key=news_key, bucket_name=bucket_name):
+                logger.info(f"  ✅ News Parquet found: {news_key}")
+            else:
+                validation_results['news_validation']['passed'] = False
+                validation_results['news_validation']['issues'].append('Parquet file not found')
+        except Exception as e:
+            validation_results['news_validation']['passed'] = False
+            validation_results['news_validation']['issues'].append(str(e))
+        
+        # Validate macro
+        try:
+            macro_key = f"silver/macro/partition_date={date_str}/macro_data.parquet"
+            if s3_hook.check_for_key(key=macro_key, bucket_name=bucket_name):
+                logger.info(f"  ✅ Macro Parquet found: {macro_key}")
+            else:
+                validation_results['macro_validation']['passed'] = False
+                validation_results['macro_validation']['issues'].append('Parquet file not found')
+        except Exception as e:
+            validation_results['macro_validation']['passed'] = False
+            validation_results['macro_validation']['issues'].append(str(e))
+        
+        logger.info(f"✅ Validation Complete: {validation_results}")
         
         return validation_results
         
     except Exception as e:
-        logger.error(f"💥 VALIDATION FAILED: {e}")
+        logger.error(f"💥 Validation failed: {str(e)}")
         raise
 
 

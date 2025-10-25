@@ -36,8 +36,7 @@ import json
 import logging
 import sys
 
-sys.path.append('/opt/airflow/dags')
-from utils.sector_mapping import get_sector, SECTOR_MAPPING, SECTOR_INFO
+# sys.path.append('/opt/airflow/dags')
 # Removed enhanced_logger import for simplified testing
 
 # Configuration
@@ -69,10 +68,6 @@ dag = DAG(
 
 def calculate_technical_indicators(df: pd.DataFrame) -> pd.DataFrame:
     """Calculate technical indicators for stock data"""
-    # Rename 'time' to 'data_date' if needed
-    if 'time' in df.columns and 'data_date' not in df.columns:
-        df = df.rename(columns={'time': 'data_date'})
-    
     df = df.sort_values('data_date')
     
     # Moving Averages
@@ -91,9 +86,6 @@ def calculate_technical_indicators(df: pd.DataFrame) -> pd.DataFrame:
     # Volatility (7-day)
     df['volatility_7d'] = df['close'].rolling(window=7).std()
     
-    # Price change percentage
-    df['price_change_pct'] = df['close'].pct_change() * 100
-    
     return df
 
 def create_market_features(**context):
@@ -109,11 +101,11 @@ def create_market_features(**context):
     try:
         s3_hook = S3Hook(aws_conn_id=S3_CONN_ID)
         end_date = execution_date.date()
-        start_date = end_date - timedelta(days=1)  # Only 2 days: yesterday + today
+        start_date = end_date - timedelta(days=30)  # 30 days for MA calculation
         
-        logging.info(f"📅 Processing stocks for LAST 2 DAYS: {start_date} to {end_date}")
+        logging.info(f"Processing stocks from {start_date} to {end_date}")
         
-        # List all stock files in Silver layer for last 2 days only
+        # List all stock files in Silver layer
         silver_prefix = 'silver/stocks/'
         all_files = s3_hook.list_keys(bucket_name=S3_BUCKET, prefix=silver_prefix)
         
@@ -121,24 +113,22 @@ def create_market_features(**context):
             logging.warning("No Silver stock files found")
             return
         
-        # Filter parquet files in date range (ONLY 2 days)
+        # Filter parquet files in date range
         stock_files = [f for f in all_files if f.endswith('.parquet') and 'partition_date=' in f]
         all_stocks = []
         
-        # Read stock files for 2 days only
+        # Read stock files
         for file_key in stock_files:
             try:
                 # Extract partition date
                 partition_str = file_key.split('partition_date=')[1].split('/')[0]
                 partition_date = datetime.strptime(partition_str, '%Y-%m-%d').date()
                 
-                # ONLY accept yesterday and today
-                if partition_date == start_date or partition_date == end_date:
+                if start_date <= partition_date <= end_date:
                     obj = s3_hook.get_key(file_key, bucket_name=S3_BUCKET)
                     parquet_data = obj.get()['Body'].read()
                     df = pd.read_parquet(BytesIO(parquet_data))
                     all_stocks.append(df)
-                    logging.info(f"  ✅ Loaded {len(df)} records from {partition_date}")
             except Exception as e:
                 logging.error(f"Error reading {file_key}: {e}")
                 continue
@@ -149,10 +139,6 @@ def create_market_features(**context):
         
         # Combine all stocks
         stocks_df = pd.concat(all_stocks, ignore_index=True)
-        
-        # Rename 'ticker' to 'symbol' for consistency
-        if 'ticker' in stocks_df.columns:
-            stocks_df = stocks_df.rename(columns={'ticker': 'symbol'})
         
         # Calculate technical indicators by symbol
         results = []
@@ -206,16 +192,12 @@ def create_market_features(**context):
 
 def create_sector_performance(**context):
     """
-    Layer 1 - ANALYTICS: Create sector_performance table (ENHANCED with 10+ sectors)
+    Layer 1 - ANALYTICS: Create sector_performance table
     Input: gold/analytics/market_features/partition_date=*/
     Output: gold/analytics/sector_performance/partition_date=YYYY-MM-DD/*.parquet
-    
-    Enhanced metrics:
-    - 13 sectors (Banking, Technology, Real Estate, Energy, Materials, Consumer, etc.)
-    - Advanced metrics: market_cap_change, sector_momentum, top gainers/losers
     """
     execution_date = context['execution_date']
-    logging.info("🚀 Starting sector performance aggregation")
+    logging.info("🚀 Starting operation")
     
     try:
         s3_hook = S3Hook(aws_conn_id=S3_CONN_ID)
@@ -228,76 +210,31 @@ def create_sector_performance(**context):
         market_parquet = [f for f in market_files if f.endswith('.parquet')]
         
         if not market_parquet:
-            logging.warning("⚠️ No market features found")
+            logging.warning("No market features found")
             return
         
         obj = s3_hook.get_key(market_parquet[0], bucket_name=S3_BUCKET)
         market_df = pd.read_parquet(BytesIO(obj.get()['Body'].read()))
         
-        logging.info(f"📊 Loaded {len(market_df)} stocks for sector analysis")
+        # Define sector mapping (simplified)
+        sector_mapping = {
+            'VCB': 'Banking', 'BID': 'Banking', 'CTG': 'Banking', 'ACB': 'Banking',
+            'VNM': 'Consumer', 'MSN': 'Consumer', 'MWG': 'Consumer',
+            'HPG': 'Materials', 'HSG': 'Materials',
+            'VIC': 'Real Estate', 'VHM': 'Real Estate'
+        }
         
-        # Map stocks to sectors using enhanced mapping
-        market_df['sector'] = market_df['symbol'].apply(get_sector)
+        market_df['sector'] = market_df['symbol'].map(sector_mapping).fillna('Others')
         
-        # Count stocks per sector
-        sector_counts = market_df['sector'].value_counts()
-        logging.info(f"🏢 Sector distribution: {sector_counts.to_dict()}")
+        # Calculate sector aggregations
+        sector_agg = market_df.groupby('sector').agg({
+            'price_change_pct': 'mean',
+            'volatility_7d': 'mean',
+            'volume': 'mean'
+        }).reset_index()
         
-        # Calculate comprehensive sector aggregations
-        sector_metrics = []
-        
-        for sector in market_df['sector'].unique():
-            sector_stocks = market_df[market_df['sector'] == sector]
-            
-            # Basic metrics
-            avg_price_change = sector_stocks['price_change_pct'].mean()
-            avg_volatility = sector_stocks['volatility_7d'].mean() if 'volatility_7d' in sector_stocks.columns else 0
-            total_volume = sector_stocks['volume'].sum()
-            avg_volume = sector_stocks['volume'].mean()
-            
-            # Market cap change (if available)
-            market_cap_change = 0
-            if 'market_cap' in sector_stocks.columns and 'price_change_pct' in sector_stocks.columns:
-                market_cap_change = (sector_stocks['market_cap'] * sector_stocks['price_change_pct'] / 100).sum()
-            
-            # Sector momentum (weighted by volume)
-            sector_momentum = 0
-            if 'volume' in sector_stocks.columns and 'price_change_pct' in sector_stocks.columns:
-                total_vol = sector_stocks['volume'].sum()
-                if total_vol > 0:
-                    sector_momentum = (sector_stocks['price_change_pct'] * sector_stocks['volume']).sum() / total_vol
-            
-            # Top gainers and losers
-            top_3_gainers = sector_stocks.nlargest(3, 'price_change_pct')['symbol'].tolist()
-            top_3_losers = sector_stocks.nsmallest(3, 'price_change_pct')['symbol'].tolist()
-            
-            # Stock counts
-            stocks_up = len(sector_stocks[sector_stocks['price_change_pct'] > 0])
-            stocks_down = len(sector_stocks[sector_stocks['price_change_pct'] < 0])
-            stocks_unchanged = len(sector_stocks[sector_stocks['price_change_pct'] == 0])
-            
-            sector_metrics.append({
-                'sector': sector,
-                'sector_name_vi': SECTOR_INFO.get(sector, {}).get('name_vi', sector),
-                'avg_price_change_pct': round(avg_price_change, 2),
-                'avg_volatility': round(avg_volatility, 2),
-                'total_volume': int(total_volume),
-                'avg_volume': int(avg_volume),
-                'market_cap_change': round(market_cap_change, 2),
-                'sector_momentum': round(sector_momentum, 2),
-                'stocks_count': len(sector_stocks),
-                'stocks_up': stocks_up,
-                'stocks_down': stocks_down,
-                'stocks_unchanged': stocks_unchanged,
-                'top_3_gainers': ','.join(top_3_gainers),
-                'top_3_losers': ','.join(top_3_losers),
-                'data_date': end_date
-            })
-        
-        sector_agg = pd.DataFrame(sector_metrics)
-        
-        # Sort by sector momentum (strongest sectors first)
-        sector_agg = sector_agg.sort_values('sector_momentum', ascending=False)
+        sector_agg.columns = ['sector', 'avg_price_change_pct', 'avg_volatility', 'avg_volume']
+        sector_agg['data_date'] = end_date
         
         # Write to Gold analytics layer
         gold_prefix = f'gold/analytics/sector_performance/partition_date={partition_date_str}/'
@@ -309,9 +246,8 @@ def create_sector_performance(**context):
         s3_key = f'{gold_prefix}sector_performance_{end_date.strftime("%Y%m%d")}.parquet'
         s3_hook.load_bytes(parquet_buffer.read(), key=s3_key, bucket_name=S3_BUCKET, replace=True)
         
-        logging.info(f"✅ Sector performance created: {len(sector_agg)} sectors")
-        logging.info(f"📈 Top performing sector: {sector_agg.iloc[0]['sector']} ({sector_agg.iloc[0]['sector_momentum']:.2f}%)")
-        logging.info(f"📉 Weakest sector: {sector_agg.iloc[-1]['sector']} ({sector_agg.iloc[-1]['sector_momentum']:.2f}%)")
+        logging.info("✅ Operation completed successfully")
+        logging.info(f"Sector performance created: {len(sector_agg)} sectors")
         
     except Exception as e:
         logging.error("❌ Operation failed")
@@ -376,58 +312,40 @@ def create_news_summary(**context):
 
 def create_macro_indicators(**context):
     """
-    Layer 1 - ANALYTICS: Create macro_indicators with daily partition (FIXED)
-    Input: silver/macro/partition_date=YYYY-MM-DD/macro_data.parquet
+    Layer 1 - ANALYTICS: Create macro_indicators table with trends
+    Input: silver/macro/partition_date=*/macro_data.parquet
     Output: gold/analytics/macro_indicators/partition_date=YYYY-MM-DD/*.parquet
-    
-    Creates NEW partition for each execution_date (not re-reading 30 days history)
     """
     execution_date = context['execution_date']
-    logging.info("🚀 Starting macro indicators daily partition")
+    logging.info("🚀 Starting operation")
     
     try:
         s3_hook = S3Hook(aws_conn_id=S3_CONN_ID)
         end_date = execution_date.date()
-        partition_date_str = end_date.strftime('%Y-%m-%d')
+        start_date = end_date - timedelta(days=30)  # 30 days for MA calculation
         
-        # Read ONLY today's macro data from Silver
-        macro_prefix = f'silver/macro/partition_date={partition_date_str}/'
-        macro_files = s3_hook.list_keys(bucket_name=S3_BUCKET, prefix=macro_prefix)
-        macro_parquet = [f for f in macro_files if f.endswith('.parquet')]
+        # Read macro data from multiple days
+        all_macro = []
+        for i in range(30):
+            date_check = end_date - timedelta(days=i)
+            partition_date_str = date_check.strftime('%Y-%m-%d')
+            
+            macro_prefix = f'silver/macro/partition_date={partition_date_str}/'
+            macro_files = s3_hook.list_keys(bucket_name=S3_BUCKET, prefix=macro_prefix)
+            macro_parquet = [f for f in macro_files if f.endswith('.parquet')]
+            
+            if macro_parquet:
+                try:
+                    obj = s3_hook.get_key(macro_parquet[0], bucket_name=S3_BUCKET)
+                    macro_df = pd.read_parquet(BytesIO(obj.get()['Body'].read()))
+                    all_macro.append(macro_df)
+                except:
+                    continue
         
-        if not macro_parquet:
-            logging.warning(f"⚠️ No macro data found for {partition_date_str}")
+        if not all_macro:
+            logging.warning("No macro data found")
             return
         
-        obj = s3_hook.get_key(macro_parquet[0], bucket_name=S3_BUCKET)
-        macro_df = pd.read_parquet(BytesIO(obj.get()['Body'].read()))
-        
-        logging.info(f"📊 Loaded {len(macro_df)} macro indicators for {partition_date_str}")
-        
-        # Add partition date to output
-        macro_df['data_date'] = end_date
-        macro_df['partition_date'] = partition_date_str
-        
-        # Write to Gold analytics layer with NEW partition
-        gold_prefix = f'gold/analytics/macro_indicators/partition_date={partition_date_str}/'
-        
-        parquet_buffer = BytesIO()
-        macro_df.to_parquet(parquet_buffer, engine='pyarrow', compression='snappy', index=False)
-        parquet_buffer.seek(0)
-        
-        s3_key = f'{gold_prefix}macro_indicators_{end_date.strftime("%Y%m%d")}.parquet'
-        s3_hook.load_bytes(parquet_buffer.read(), key=s3_key, bucket_name=S3_BUCKET, replace=True)
-        
-        logging.info(f"✅ Macro indicators created: {len(macro_df)} indicators for partition {partition_date_str}")
-        
-    except Exception as e:
-        logging.error(f"❌ Macro indicators failed: {str(e)}")
-        raise
-
-
-# ========================================
-# LAYER 2 - SENTIMENT ANALYSIS
-# ========================================
         combined_macro = pd.concat(all_macro, ignore_index=True)
         
         # Calculate indicators with moving averages
@@ -472,68 +390,68 @@ def create_macro_indicators(**context):
 
 def create_sentiment_analysis(**context):
     """
-    Layer 2 - SENTIMENT_ANALYSIS: Aggregate news sentiment (FIXED - use Silver sentiment)
-    Input: silver/news/partition_date=*/news_cleaned.parquet (with sentiment_score from Silver)
+    Layer 2 - SENTIMENT_ANALYSIS: Aggregate news sentiment by date and source
+    Input: silver/news/partition_date=*/news_cleaned.parquet
     Output: gold/sentiment_analysis/partition_date=YYYY-MM-DD/*.parquet
-    
-    NOW USES REAL SENTIMENT from Silver layer (not hardcoded 0)
     """
     execution_date = context['execution_date']
-    logging.info("🚀 Starting sentiment analysis aggregation")
+    logging.info("🚀 Starting operation")
     
     try:
         s3_hook = S3Hook(aws_conn_id=S3_CONN_ID)
         end_date = execution_date.date()
-        partition_date_str = end_date.strftime('%Y-%m-%d')
+        start_date = end_date - timedelta(days=7)  # Last 7 days
         
-        # Read ONLY TODAY's news with sentiment from Silver
-        news_prefix = f'silver/news/partition_date={partition_date_str}/'
-        news_files = s3_hook.list_keys(bucket_name=S3_BUCKET, prefix=news_prefix)
-        news_parquet = [f for f in news_files if f.endswith('.parquet')]
+        # Read news data from multiple days
+        all_news = []
+        for i in range(7):
+            date_check = end_date - timedelta(days=i)
+            partition_date_str = date_check.strftime('%Y-%m-%d')
+            
+            news_prefix = f'silver/news/partition_date={partition_date_str}/'
+            news_files = s3_hook.list_keys(bucket_name=S3_BUCKET, prefix=news_prefix)
+            news_parquet = [f for f in news_files if f.endswith('.parquet')]
+            
+            if news_parquet:
+                try:
+                    obj = s3_hook.get_key(news_parquet[0], bucket_name=S3_BUCKET)
+                    news_df = pd.read_parquet(BytesIO(obj.get()['Body'].read()))
+                    all_news.append(news_df)
+                except:
+                    continue
         
-        if not news_parquet:
-            logging.warning(f"⚠️ No news data found for {partition_date_str}")
+        if not all_news:
+            logging.warning("No news data found")
             return
         
-        obj = s3_hook.get_key(news_parquet[0], bucket_name=S3_BUCKET)
-        news_df = pd.read_parquet(BytesIO(obj.get()['Body'].read()))
+        combined_news = pd.concat(all_news, ignore_index=True)
         
-        logging.info(f"📰 Loaded {len(news_df)} news articles for {partition_date_str}")
+        # Ensure we have necessary columns
+        if 'data_date' not in combined_news.columns:
+            combined_news['data_date'] = end_date
+        if 'source' not in combined_news.columns:
+            combined_news['source'] = 'unknown'
+        if 'sentiment_score' not in combined_news.columns:
+            combined_news['sentiment_score'] = 0.0
         
-        # Ensure we have sentiment_score (should be from Silver)
-        if 'sentiment_score' not in news_df.columns:
-            logging.warning("⚠️ No sentiment_score column - using 0")
-            news_df['sentiment_score'] = 0.0
-        else:
-            logging.info(f"✅ Using REAL sentiment scores from Silver (avg={news_df['sentiment_score'].mean():.2f})")
+        # Aggregate sentiment by date and source
+        sentiment_agg = combined_news.groupby(['data_date', 'source']).agg({
+            'sentiment_score': ['mean', 'count'],
+        }).reset_index()
         
-        # Ensure source column exists
-        if 'source' not in news_df.columns:
-            news_df['source'] = 'unknown'
+        sentiment_agg.columns = ['data_date', 'source', 'avg_sentiment', 'article_count']
         
-        # Aggregate sentiment by source
-        sentiment_by_source = []
-        for source in news_df['source'].unique():
-            source_news = news_df[news_df['source'] == source]
-            
-            sentiment_by_source.append({
-                'data_date': end_date,
-                'source': source,
-                'avg_sentiment': round(source_news['sentiment_score'].mean(), 2),
-                'article_count': len(source_news),
-                'positive_count': len(source_news[source_news['sentiment_score'] > 0]),
-                'negative_count': len(source_news[source_news['sentiment_score'] < 0]),
-                'neutral_count': len(source_news[source_news['sentiment_score'] == 0]),
-                'max_sentiment': round(source_news['sentiment_score'].max(), 2),
-                'min_sentiment': round(source_news['sentiment_score'].min(), 2)
-            })
+        # Calculate sentiment counts
+        sentiment_agg['positive_count'] = combined_news.groupby(['data_date', 'source'])['sentiment_score'].apply(lambda x: (x > 0).sum()).values
+        sentiment_agg['negative_count'] = combined_news.groupby(['data_date', 'source'])['sentiment_score'].apply(lambda x: (x < 0).sum()).values
+        sentiment_agg['neutral_count'] = sentiment_agg['article_count'] - sentiment_agg['positive_count'] - sentiment_agg['negative_count']
         
-        sentiment_agg = pd.DataFrame(sentiment_by_source)
-        
-        # Sort by avg_sentiment descending
-        sentiment_agg = sentiment_agg.sort_values('avg_sentiment', ascending=False)
+        # Calculate sentiment change (compared to previous day)
+        sentiment_agg = sentiment_agg.sort_values(['source', 'data_date'])
+        sentiment_agg['sentiment_change_pct'] = sentiment_agg.groupby('source')['avg_sentiment'].pct_change() * 100
         
         # Write to Gold sentiment_analysis layer
+        partition_date_str = end_date.strftime('%Y-%m-%d')
         gold_prefix = f'gold/sentiment_analysis/partition_date={partition_date_str}/'
         
         parquet_buffer = BytesIO()
@@ -543,12 +461,11 @@ def create_sentiment_analysis(**context):
         s3_key = f'{gold_prefix}sentiment_analysis_{end_date.strftime("%Y%m%d")}.parquet'
         s3_hook.load_bytes(parquet_buffer.read(), key=s3_key, bucket_name=S3_BUCKET, replace=True)
         
-        logging.info(f"✅ Sentiment analysis created: {len(sentiment_agg)} sources")
-        logging.info(f"📊 Overall avg sentiment: {news_df['sentiment_score'].mean():.2f}")
-        logging.info(f"📈 Most positive source: {sentiment_agg.iloc[0]['source']} ({sentiment_agg.iloc[0]['avg_sentiment']:.2f})")
+        logging.info("✅ Operation completed successfully")
+        logging.info(f"Sentiment analysis created: {len(sentiment_agg)} aggregations")
         
     except Exception as e:
-        logging.error(f"❌ Sentiment analysis failed: {str(e)}")
+        logging.error("❌ Operation failed")
         raise
 
 def create_serving_cache(**context):
