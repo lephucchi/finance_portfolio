@@ -16,7 +16,7 @@ import os
 default_args = {
     'owner': 'finance_portfolio',
     'depends_on_past': False,
-    'start_date': datetime(2024, 1, 1),
+    'start_date': datetime(2025, 10, 27),  # Current date to avoid future execution date issues
     'email_on_failure': False,
     'email_on_retry': False,
     'retry_delay': timedelta(minutes=5),
@@ -28,7 +28,7 @@ dag = DAG(
     'rag_pipeline',
     default_args=default_args,
     description='RAG Pipeline for Vietnamese Financial News Embedding and Vector Database',
-    schedule_interval='0 9 * * 1-5',  # 9:00 AM weekdays, after gold layer
+    schedule_interval=None,  # Triggered by master_pipeline only
     catchup=False,
     max_active_runs=1,
     tags=['rag', 'vietnamese', 'embedding', 'vectordb', 'finance']
@@ -37,8 +37,10 @@ dag = DAG(
 def extract_processed_news(**context):
     """Extract processed news from silver layer for embedding"""
     try:
-        execution_date = context['execution_date']
-        date_str = execution_date.strftime('%Y-%m-%d')
+        # Use current date for real-time processing
+        from datetime import datetime
+        date_str = datetime.now().strftime('%Y-%m-%d')
+        execution_date = context.get('execution_date', datetime.now())
         
         logging.info(f"📰 Extracting processed news for RAG pipeline - {date_str}")
         
@@ -146,8 +148,10 @@ def extract_processed_news(**context):
 def create_vietnamese_embeddings(**context):
     """Create Vietnamese SBERT embeddings for news articles"""
     try:
-        execution_date = context['execution_date']
-        date_str = execution_date.strftime('%Y-%m-%d')
+        # Use current date for real-time processing
+        from datetime import datetime
+        date_str = datetime.now().strftime('%Y-%m-%d')
+        execution_date = context.get('execution_date', datetime.now())
         
         logging.info(f"🤖 Creating Vietnamese SBERT embeddings for {date_str}")
         
@@ -280,8 +284,10 @@ def create_vietnamese_embeddings(**context):
 def update_vector_database(**context):
     """Update FAISS vector database with new embeddings"""
     try:
-        execution_date = context['execution_date']
-        date_str = execution_date.strftime('%Y-%m-%d')
+        # Use current date for real-time processing
+        from datetime import datetime
+        date_str = datetime.now().strftime('%Y-%m-%d')
+        execution_date = context.get('execution_date', datetime.now())
         
         logging.info(f"🗄️ Updating FAISS vector database for {date_str}")
         
@@ -432,8 +438,10 @@ def update_vector_database(**context):
 def validate_rag_pipeline(**context):
     """Validate RAG pipeline outputs"""
     try:
-        execution_date = context['execution_date']
-        date_str = execution_date.strftime('%Y-%m-%d')
+        # Use current date for real-time processing
+        from datetime import datetime
+        date_str = datetime.now().strftime('%Y-%m-%d')
+        execution_date = context.get('execution_date', datetime.now())
         
         logging.info(f"🔍 Validating RAG pipeline for {date_str}")
         

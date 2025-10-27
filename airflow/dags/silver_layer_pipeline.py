@@ -25,13 +25,13 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
-from enhanced_logger import log_pipeline_start, log_pipeline_success, log_pipeline_error
+# Removed problematic enhanced_logger import
 
 # Default arguments
 default_args = {
     'owner': 'finance_portfolio',
     'depends_on_past': False,
-    'start_date': datetime(2024, 1, 1),
+    'start_date': datetime(2025, 10, 27),  # Current date to avoid future execution date issues
     'email_on_failure': True,
     'email_on_retry': False,
     'retries': 3,
@@ -44,7 +44,7 @@ dag = DAG(
     'silver_layer_pipeline',
     default_args=default_args,
     description='Silver layer data processing (Bronze → Parquet + partitioning)',
-    schedule_interval='0 7 * * 1-5',  # 7 AM weekdays
+    schedule_interval=None,  # Triggered by master_pipeline only
     catchup=False,
     tags=['silver', 'lakehouse', 'parquet'],
     max_active_runs=1
@@ -61,8 +61,10 @@ def process_stock_data(**context):
         from airflow.providers.amazon.aws.hooks.s3 import S3Hook
         import io
         
-        execution_date = context['execution_date']
-        date_str = execution_date.strftime('%Y-%m-%d')
+        # Use current date for real-time processing
+        from datetime import datetime
+        date_str = datetime.now().strftime('%Y-%m-%d')
+        execution_date = context.get('execution_date', datetime.now())
         
         logger = logging.getLogger(__name__)
         logger.info(f"📈 Starting stock data processing for {date_str}")
@@ -74,9 +76,6 @@ def process_stock_data(**context):
             'data_type': 'stocks',
             'execution_date': date_str
         }
-        
-        log_pipeline_start(logger, metadata)
-        
         # Initialize S3
         s3_hook = S3Hook(aws_conn_id='aws_default')
         bucket_name = os.getenv('S3_BUCKET', 'bankanalystportfolio')
@@ -95,7 +94,6 @@ def process_stock_data(**context):
         if not stock_files:
             logger.warning(f"⚠️ No stock files found for {date_str}")
             result = {'stocks_processed': 0, 'execution_date': date_str}
-            log_pipeline_success(logger, metadata, result)
             return result
         
         logger.info(f"📊 Found {len(stock_files)} stock files")
@@ -147,7 +145,6 @@ def process_stock_data(**context):
         if not all_records:
             logger.warning(f"⚠️ No valid stock records after processing")
             result = {'stocks_processed': 0, 'execution_date': date_str}
-            log_pipeline_success(logger, metadata, result)
             return result
         
         logger.info(f"📝 Loaded {len(all_records)} stock records")
@@ -270,8 +267,6 @@ def process_stock_data(**context):
             'partition_date': date_str,
             'execution_date': date_str
         }
-        
-        log_pipeline_success(logger, metadata, result)
         logger.info(f"✅ Stock Processing Complete: {result}")
         
         return result
@@ -281,8 +276,6 @@ def process_stock_data(**context):
             'files_found': len(stock_files) if 'stock_files' in locals() else 0,
             'records_processed': len(df) if 'df' in locals() else 0
         }
-        
-        log_pipeline_error(logger, metadata, e, context_data)
         raise
 
 
@@ -296,8 +289,10 @@ def process_news_data(**context):
         from airflow.providers.amazon.aws.hooks.s3 import S3Hook
         import io
         
-        execution_date = context['execution_date']
-        date_str = execution_date.strftime('%Y-%m-%d')
+        # Use current date for real-time processing
+        from datetime import datetime
+        date_str = datetime.now().strftime('%Y-%m-%d')
+        execution_date = context.get('execution_date', datetime.now())
         
         logger = logging.getLogger(__name__)
         logger.info(f"📰 Starting news data processing for {date_str}")
@@ -309,9 +304,6 @@ def process_news_data(**context):
             'data_type': 'news',
             'execution_date': date_str
         }
-        
-        log_pipeline_start(logger, metadata)
-        
         # Initialize S3
         s3_hook = S3Hook(aws_conn_id='aws_default')
         bucket_name = os.getenv('S3_BUCKET', 'bankanalystportfolio')
@@ -331,7 +323,6 @@ def process_news_data(**context):
         if not news_files:
             logger.warning(f"⚠️ No news files found")
             result = {'news_processed': 0, 'execution_date': date_str}
-            log_pipeline_success(logger, metadata, result)
             return result
         
         logger.info(f"📊 Found {len(news_files)} news files")
@@ -359,7 +350,6 @@ def process_news_data(**context):
         if not all_records:
             logger.warning(f"⚠️ No valid news records")
             result = {'news_processed': 0, 'execution_date': date_str}
-            log_pipeline_success(logger, metadata, result)
             return result
         
         logger.info(f"📝 Loaded {len(all_records)} news records")
@@ -494,8 +484,6 @@ def process_news_data(**context):
             'partition_date': date_str,
             'execution_date': date_str
         }
-        
-        log_pipeline_success(logger, metadata, result)
         logger.info(f"✅ News Processing Complete: {result}")
         
         return result
@@ -505,8 +493,6 @@ def process_news_data(**context):
             'files_found': len(news_files) if 'news_files' in locals() else 0,
             'records_processed': len(df) if 'df' in locals() else 0
         }
-        
-        log_pipeline_error(logger, metadata, e, context_data)
         raise
 
 
@@ -520,8 +506,10 @@ def process_macro_data(**context):
         from airflow.providers.amazon.aws.hooks.s3 import S3Hook
         import io
         
-        execution_date = context['execution_date']
-        date_str = execution_date.strftime('%Y-%m-%d')
+        # Use current date for real-time processing
+        from datetime import datetime
+        date_str = datetime.now().strftime('%Y-%m-%d')
+        execution_date = context.get('execution_date', datetime.now())
         
         logger = logging.getLogger(__name__)
         logger.info(f"📊 Starting macro data processing for {date_str}")
@@ -533,9 +521,6 @@ def process_macro_data(**context):
             'data_type': 'macro',
             'execution_date': date_str
         }
-        
-        log_pipeline_start(logger, metadata)
-        
         # Initialize S3
         s3_hook = S3Hook(aws_conn_id='aws_default')
         bucket_name = os.getenv('S3_BUCKET', 'bankanalystportfolio')
@@ -554,7 +539,6 @@ def process_macro_data(**context):
         if not macro_files:
             logger.warning(f"⚠️ No macro files found")
             result = {'macro_indicators_processed': 0, 'execution_date': date_str}
-            log_pipeline_success(logger, metadata, result)
             return result
         
         logger.info(f"📊 Found {len(macro_files)} macro CSV files")
@@ -591,7 +575,6 @@ def process_macro_data(**context):
         if not all_data:
             logger.warning(f"⚠️ No valid macro data")
             result = {'macro_indicators_processed': 0, 'execution_date': date_str}
-            log_pipeline_success(logger, metadata, result)
             return result
         
         # Merge all dataframes
@@ -687,8 +670,6 @@ def process_macro_data(**context):
             'partition_date': date_str,
             'execution_date': date_str
         }
-        
-        log_pipeline_success(logger, metadata, result)
         logger.info(f"✅ Macro Processing Complete: {result}")
         
         return result
@@ -698,8 +679,6 @@ def process_macro_data(**context):
             'files_found': len(macro_files) if 'macro_files' in locals() else 0,
             'records_processed': len(df) if 'df' in locals() else 0
         }
-        
-        log_pipeline_error(logger, metadata, e, context_data)
         raise
 
 
@@ -711,8 +690,10 @@ def validate_silver_data(**context):
         s3_hook = S3Hook(aws_conn_id='aws_default')
         bucket_name = os.getenv('S3_BUCKET', 'bankanalystportfolio')
         
-        execution_date = context['execution_date']
-        date_str = execution_date.strftime('%Y-%m-%d')
+        # Use current date for real-time processing
+        from datetime import datetime
+        date_str = datetime.now().strftime('%Y-%m-%d')
+        execution_date = context.get('execution_date', datetime.now())
         
         logger = logging.getLogger(__name__)
         logger.info(f"🔍 Starting Silver data validation for {date_str}")

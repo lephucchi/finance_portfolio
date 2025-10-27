@@ -12,11 +12,9 @@ from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.operators.bash import BashOperator
 from airflow.operators.dummy import DummyOperator
+from airflow.operators.trigger_dagrun import TriggerDagRunOperator
 from airflow.providers.amazon.aws.hooks.s3 import S3Hook
-from airflow.providers.amazon.aws.sensors.s3 import S3KeySensor
 from airflow.utils.trigger_rule import TriggerRule
-from airflow.utils.dates import days_ago
-from airflow.sensors.external_task import ExternalTaskSensor
 import logging
 import os
 
@@ -24,7 +22,7 @@ import os
 default_args = {
     'owner': 'finance_portfolio',
     'depends_on_past': False,
-    'start_date': datetime(2024, 1, 1),
+    'start_date': datetime(2025, 10, 27),  # Today to allow manual triggers
     'email_on_failure': False,
     'email_on_retry': False,
     'retries': 2,
@@ -193,78 +191,45 @@ dependency_check = PythonOperator(
     dag=dag,
 )
 
-# Pipeline trigger tasks (will be implemented in separate DAGs)
-# External pipeline sensors to monitor completion
-bronze_sensor = ExternalTaskSensor(
-    task_id='wait_for_bronze_completion',
-    external_dag_id='bronze_layer_pipeline',
-    external_task_id='validate_bronze_data',
-    allowed_states=['success'],
-    failed_states=['failed', 'upstream_failed'],
-    timeout=3600,  # 1 hour timeout
-    poke_interval=300,  # Check every 5 minutes
-    mode='reschedule',
-    dag=dag,
-)
-
-silver_sensor = ExternalTaskSensor(
-    task_id='wait_for_silver_completion',
-    external_dag_id='silver_layer_pipeline',
-    external_task_id='validate_silver_data',
-    allowed_states=['success'],
-    failed_states=['failed', 'upstream_failed'],
-    timeout=3600,
-    poke_interval=300,
-    mode='reschedule',
-    dag=dag,
-)
-
-gold_sensor = ExternalTaskSensor(
-    task_id='wait_for_gold_completion',
-    external_dag_id='gold_layer_pipeline',
-    external_task_id='track_pipeline_metadata',
-    allowed_states=['success'],
-    failed_states=['failed', 'upstream_failed'],
-    timeout=3600,
-    poke_interval=300,
-    mode='reschedule',
-    dag=dag,
-)
-
-rag_sensor = ExternalTaskSensor(
-    task_id='wait_for_rag_completion',
-    external_dag_id='rag_pipeline',
-    external_task_id='validate_rag_pipeline',
-    allowed_states=['success'],
-    failed_states=['failed', 'upstream_failed'],
-    timeout=3600,
-    poke_interval=300,
-    mode='reschedule',
-    dag=dag,
-)
-
-# Pipeline trigger operators
-trigger_bronze = BashOperator(
+# Pipeline trigger operators - Actually trigger the DAGs
+# Use allowed_states and failed_states to control flow
+trigger_bronze = TriggerDagRunOperator(
     task_id='trigger_bronze_pipeline',
-    bash_command='echo "🔵 Triggering Bronze layer pipeline at $(date)"',
+    trigger_dag_id='bronze_layer_pipeline',
+    wait_for_completion=True,
+    poke_interval=60,
+    allowed_states=['success'],
+    failed_states=['failed'],
     dag=dag,
 )
 
-trigger_silver = BashOperator(
+trigger_silver = TriggerDagRunOperator(
     task_id='trigger_silver_pipeline',
-    bash_command='echo "🥈 Triggering Silver layer pipeline at $(date)"',
+    trigger_dag_id='silver_layer_pipeline',
+    wait_for_completion=True,
+    poke_interval=60,
+    allowed_states=['success'],
+    failed_states=['failed'],
     dag=dag,
 )
 
-trigger_gold = BashOperator(
+trigger_gold = TriggerDagRunOperator(
     task_id='trigger_gold_pipeline',
-    bash_command='echo "🥇 Triggering Gold layer pipeline at $(date)"',
+    trigger_dag_id='gold_layer_pipeline',
+    wait_for_completion=True,
+    poke_interval=60,
+    allowed_states=['success'],
+    failed_states=['failed'],
     dag=dag,
 )
 
-trigger_rag = BashOperator(
+trigger_rag = TriggerDagRunOperator(
     task_id='trigger_rag_pipeline',
-    bash_command='echo "🤖 Triggering RAG pipeline at $(date)"',
+    trigger_dag_id='rag_pipeline',
+    wait_for_completion=True,
+    poke_interval=60,
+    allowed_states=['success'],
+    failed_states=['failed'],
     dag=dag,
 )
 
@@ -295,23 +260,24 @@ end_task = DummyOperator(
     dag=dag,
 )
 
-# Task dependencies - Proper pipeline orchestration
+# Task dependencies - Proper pipeline orchestration with TriggerDagRunOperator
+# These operators now wait_for_completion=True, so no need for separate sensors
 start_task >> [market_check, aws_validation] >> dependency_check >> health_check
 
-# Bronze layer (starts first)
-health_check >> trigger_bronze >> bronze_sensor
+# Bronze layer (starts first) - TriggerDagRunOperator waits for completion
+health_check >> trigger_bronze
 
-# Silver layer (after bronze completion)  
-bronze_sensor >> trigger_silver >> silver_sensor
+# Silver layer (after bronze completion)
+trigger_bronze >> trigger_silver
 
 # Gold layer (after silver completion)
-silver_sensor >> trigger_gold >> gold_sensor
+trigger_silver >> trigger_gold
 
 # RAG pipeline (after gold completion for news processing)
-gold_sensor >> trigger_rag >> rag_sensor
+trigger_gold >> trigger_rag
 
 # Final reporting (after all pipelines complete)
-rag_sensor >> daily_report >> end_task
+trigger_rag >> daily_report >> end_task
 
 # Make DAG available
 globals()['master_pipeline_v2'] = dag

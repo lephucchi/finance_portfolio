@@ -47,7 +47,7 @@ S3_CONN_ID = 'aws_s3_conn'
 default_args = {
     'owner': 'finance_portfolio',
     'depends_on_past': False,
-    'start_date': datetime(2024, 1, 1),
+    'start_date': datetime(2025, 10, 27),  # Current date to avoid future execution date issues
     'email_on_failure': False,
     'email_on_retry': False,
     'retries': 2,
@@ -60,7 +60,7 @@ dag = DAG(
     'gold_layer_pipeline',
     default_args=default_args,
     description='Gold layer - 4-layer analytics architecture',
-    schedule_interval='0 8 * * 1-5',  # 8 AM weekdays
+    schedule_interval=None,  # Triggered by master_pipeline only
     catchup=False,
     tags=['gold', 'lakehouse', 'analytics'],
     max_active_runs=1
