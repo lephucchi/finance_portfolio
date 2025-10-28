@@ -1,8 +1,14 @@
 """
-RAG Pipeline DAG - Tự động cập nhật vectordb từ tin tức hàng ngày
-Created based on user requirement for Vietnamese SBERT embedding and FAISS vector database
+RAG Pipeline DAG - Production-ready Vietnamese SBERT & FAISS
+Improvements from analysis:
+- Real Vietnamese SBERT embeddings (keepitreal/vietnamese-sbert)
+- Real FAISS vector database operations
+- Document chunking for better context
+- Deduplication handling
+- Search/retrieval capabilities
+- Comprehensive validation & testing
 
-Schedule: Chạy sau gold layer pipeline để sử dụng processed news data
+Schedule: Triggered by master_pipeline after gold layer
 Author: Finance Portfolio System
 """
 
@@ -16,437 +22,560 @@ import os
 default_args = {
     'owner': 'finance_portfolio',
     'depends_on_past': False,
-    'start_date': datetime(2025, 10, 27),  # Current date to avoid future execution date issues
+    'start_date': datetime(2025, 10, 27),
     'email_on_failure': False,
     'email_on_retry': False,
     'retry_delay': timedelta(minutes=5),
-    'retries': 1,
+    'retries': 2,
 }
 
 # DAG definition
 dag = DAG(
     'rag_pipeline',
     default_args=default_args,
-    description='RAG Pipeline for Vietnamese Financial News Embedding and Vector Database',
-    schedule_interval=None,  # Triggered by master_pipeline only
+    description='Production RAG Pipeline with Real Vietnamese SBERT and FAISS',
+    schedule_interval=None,  # Triggered by master_pipeline
     catchup=False,
     max_active_runs=1,
-    tags=['rag', 'vietnamese', 'embedding', 'vectordb', 'finance']
+    tags=['rag', 'vietnamese', 'sbert', 'faiss', 'production']
 )
 
-def extract_processed_news(**context):
-    """Extract processed news from silver layer for embedding"""
+def extract_and_prepare_documents(**context):
+    """
+    Extract processed news and prepare documents with chunking
+    Improvements:
+    - Smart chunking for long documents
+    - Metadata enrichment
+    - Deduplication check
+    """
     try:
-        # Use current date for real-time processing
         from datetime import datetime
         date_str = datetime.now().strftime('%Y-%m-%d')
-        execution_date = context.get('execution_date', datetime.now())
         
-        logging.info(f"📰 Extracting processed news for RAG pipeline - {date_str}")
+        logging.info(f"📰 Extracting and preparing documents for RAG - {date_str}")
         
         from airflow.providers.amazon.aws.hooks.s3 import S3Hook
         import pandas as pd
         import json
+        import sys
+        
+        # Add utils to path
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'utils'))
+        from embedding_utils import prepare_documents_for_embedding
         
         # Initialize S3
         s3_hook = S3Hook(aws_conn_id='aws_default')
         bucket_name = os.getenv('S3_BUCKET', 'bankanalystportfolio')
         
+        # Read processed news from silver layer (Parquet format)
+        news_file_key = f"silver/news/partition_date={date_str}/news_cleaned.parquet"
+        
+        if not s3_hook.check_for_key(key=news_file_key, bucket_name=bucket_name):
+            logging.warning(f"⚠️ No processed news found for {date_str}")
+            logging.info(f"   Expected: {news_file_key}")
+            context['task_instance'].xcom_push(key='documents_prepared', value=0)
+            return {'documents_prepared': 0, 'execution_date': date_str}
+        
+        # Load news data from Parquet (read as binary to avoid utf-8 decode errors)
+        logging.info(f"📥 Reading Parquet: {news_file_key}")
+        import io
+        # Use S3 client get_object to read binary parquet bytes
+        s3_client = s3_hook.get_conn()
         try:
-            # Read processed news from silver layer
-            news_file_key = f"silver/news/processed/clean_news_{date_str}.csv"
-            
-            if not s3_hook.check_for_key(key=news_file_key, bucket_name=bucket_name):
-                logging.warning(f"⚠️ No processed news found for {date_str}")
-                return {'news_articles': 0, 'execution_date': date_str}
-            
-            # Load news data
-            csv_content = s3_hook.read_key(key=news_file_key, bucket_name=bucket_name)
-            news_df = pd.read_csv(pd.StringIO(csv_content))
-            
-            logging.info(f"📄 Loaded {len(news_df)} processed news articles")
-            
-            # Filter for embedding - prioritize quality content
-            embedding_df = news_df[
-                (news_df['content_length'] >= 100) &  # Minimum content length
-                (news_df['clean_content'].notna()) &  # Has clean content
-                (news_df['topic_category'].isin(['BANKING', 'FINANCE', 'ECONOMY']))  # Relevant topics
-            ].copy()
-            
-            if len(embedding_df) == 0:
-                logging.warning(f"⚠️ No suitable articles for embedding after filtering")
-                return {'news_articles': 0, 'execution_date': date_str}
-            
-            # Prepare embedding content - combine title and clean content
-            embedding_df['embedding_text'] = (
-                embedding_df['title'].fillna('') + ' ' + 
-                embedding_df['clean_content'].fillna('')
-            ).str.strip()
-            
-            # Add metadata for vector search
-            embedding_df['doc_id'] = embedding_df['url'].apply(lambda x: str(hash(x))[-8:])  # Unique doc ID
-            embedding_df['doc_date'] = date_str
-            embedding_df['doc_category'] = embedding_df['topic_category']
-            embedding_df['doc_sentiment'] = embedding_df['sentiment_basic']
-            embedding_df['doc_source'] = embedding_df['source'].fillna('Unknown')
-            
-            # Select only needed columns for embedding
-            rag_columns = [
-                'doc_id', 'title', 'embedding_text', 'url', 'doc_date', 
-                'doc_category', 'doc_sentiment', 'doc_source', 'content_length'
-            ]
-            
-            rag_df = embedding_df[rag_columns].copy()
-            
-            # Save RAG preparation data
-            rag_csv_content = rag_df.to_csv(index=False)
-            rag_key = f"rag/staging/news_for_embedding_{date_str}.csv"
-            
-            s3_hook.load_string(
-                string_data=rag_csv_content,
-                key=rag_key,
-                bucket_name=bucket_name,
-                replace=True
-            )
-            
-            # Create metadata
-            rag_metadata = {
-                'processing_date': date_str,
-                'total_articles': len(rag_df),
-                'categories': rag_df['doc_category'].value_counts().to_dict(),
-                'sentiments': rag_df['doc_sentiment'].value_counts().to_dict(),
-                'sources': rag_df['doc_source'].value_counts().to_dict(),
-                'avg_content_length': float(rag_df['content_length'].mean()),
-                '_created_at_utc': pd.Timestamp.utcnow().isoformat() + 'Z'
-            }
-            
-            metadata_key = f"rag/metadata/extraction_meta_{date_str}.json"
-            s3_hook.load_string(
-                string_data=json.dumps(rag_metadata, ensure_ascii=False, indent=2),
-                key=metadata_key,
-                bucket_name=bucket_name,
-                replace=True
-            )
-            
-            result = {
-                'news_articles': len(rag_df),
-                'categories': list(rag_df['doc_category'].unique()),
-                'execution_date': date_str
-            }
-            
-            logging.info(f"✅ RAG news extraction completed: {result}")
-            return result
-            
+            obj = s3_client.get_object(Bucket=bucket_name, Key=news_file_key)
+            parquet_bytes = obj['Body'].read()
         except Exception as e:
-            logging.error(f"❌ RAG news extraction failed: {str(e)}")
-            return {'news_articles': 0, 'execution_date': date_str}
+            logging.error(f"❌ Failed to download parquet from S3: {e}")
+            context['task_instance'].xcom_push(key='documents_prepared', value=0)
+            return {'documents_prepared': 0, 'execution_date': date_str}
+
+        # Read parquet from bytes buffer
+        news_df = pd.read_parquet(io.BytesIO(parquet_bytes))
+        
+        logging.info(f"📄 Loaded {len(news_df)} news articles from Silver layer")
+        
+        # ===== MAP SILVER SCHEMA TO RAG SCHEMA =====
+        # Silver columns: id, data_date, source, title, content, link, _ingested_at_utc, partition_date
+        # RAG needs: clean_content (for embedding), url, title, source
+        
+        # Rename columns to match RAG expectations
+        column_mapping = {
+            'content': 'clean_content',  # Silver 'content' → RAG 'clean_content' 
+            'link': 'url',                # Silver 'link' → RAG 'url'
+            'data_date': 'published_date' # Silver 'data_date' → RAG 'published_date'
+        }
+        
+        news_df = news_df.rename(columns=column_mapping)
+        
+        # Add content_length
+        news_df['content_length'] = news_df['clean_content'].fillna('').str.len()
+        
+        # Add basic categorization (simple keyword-based since Gold layer does NLP)
+        def categorize_news(title, content):
+            """Simple keyword-based categorization"""
+            text = f"{title} {content}".lower()
+            
+            if any(word in text for word in ['ngân hàng', 'bank', 'tín dụng', 'cho vay', 'lãi suất']):
+                return 'BANKING'
+            elif any(word in text for word in ['chứng khoán', 'cổ phiếu', 'stock', 'vnindex', 'thị trường']):
+                return 'FINANCE'
+            elif any(word in text for word in ['gdp', 'kinh tế', 'xuất khẩu', 'nhập khẩu', 'lạm phát']):
+                return 'ECONOMY'
+            else:
+                return 'FINANCE'  # Default
+        
+        news_df['topic_category'] = news_df.apply(
+            lambda row: categorize_news(
+                row.get('title', ''), 
+                row.get('clean_content', '')
+            ), 
+            axis=1
+        )
+        
+        # Add basic sentiment (simple rule-based since Gold layer does proper NLP)
+        def basic_sentiment(title, content):
+            """Simple rule-based sentiment"""
+            text = f"{title} {content}".lower()
+            
+            positive_words = ['tăng trưởng', 'tích cực', 'khả quan', 'tăng', 'phục hồi', 'cải thiện']
+            negative_words = ['giảm', 'khó khăn', 'suy thoái', 'lo ngại', 'rủi ro', 'thiệt hại']
+            
+            pos_count = sum(1 for word in positive_words if word in text)
+            neg_count = sum(1 for word in negative_words if word in text)
+            
+            if pos_count > neg_count:
+                return 'POSITIVE'
+            elif neg_count > pos_count:
+                return 'NEGATIVE'
+            else:
+                return 'NEUTRAL'
+        
+        news_df['sentiment_basic'] = news_df.apply(
+            lambda row: basic_sentiment(
+                row.get('title', ''), 
+                row.get('clean_content', '')
+            ), 
+            axis=1
+        )
+        
+        logging.info(f"✅ Mapped Silver schema to RAG schema")
+        logging.info(f"   Columns: {list(news_df.columns)}")
+        
+        # Filter for quality content
+        filtered_df = news_df[
+            (news_df['content_length'] >= 100) &  # Minimum 100 characters
+            (news_df['clean_content'].notna()) &   # Has content
+            (news_df['clean_content'].str.strip() != '')  # Not empty
+        ].copy()
+        
+        if len(filtered_df) == 0:
+            logging.warning("⚠️ No suitable articles after filtering")
+            context['task_instance'].xcom_push(key='documents_prepared', value=0)
+            return {'documents_prepared': 0, 'execution_date': date_str}
+        
+        logging.info(f"✅ Filtered to {len(filtered_df)} quality articles")
+        
+        # ===== SAVE RAW INPUT TO S3 =====
+        # Save original filtered news as raw input for RAG
+        raw_csv = filtered_df.to_csv(index=False)
+        raw_input_key = f"rag/input/raw_news_{date_str}.csv"
+        
+        s3_hook.load_string(
+            string_data=raw_csv,
+            key=raw_input_key,
+            bucket_name=bucket_name,
+            replace=True
+        )
+        logging.info(f"💾 Saved raw input: {raw_input_key}")
+        
+        # Prepare documents with chunking
+        filtered_df['doc_id'] = filtered_df['url'].apply(lambda x: str(hash(x))[-8:])
+        filtered_df['doc_date'] = date_str
+        filtered_df['doc_category'] = filtered_df['topic_category']
+        filtered_df['doc_sentiment'] = filtered_df['sentiment_basic']
+        filtered_df['doc_source'] = filtered_df['source'].fillna('Unknown')
+        
+        # Apply smart chunking
+        documents = prepare_documents_for_embedding(
+            filtered_df,
+            chunking_method='sentences',  # Chunk long documents
+            max_chunk_size=512,  # Optimal for SBERT
+            add_metadata_to_text=True  # Add category context
+        )
+        
+        logging.info(f"📝 Prepared {len(documents)} document chunks (from {len(filtered_df)} articles)")
+        
+        # ===== SAVE PROCESSED DATA FOR EMBEDDING =====
+        # Save processed documents ready for embedding as CSV
+        processed_df = pd.DataFrame([
+            {
+                'doc_id': doc['doc_id'],
+                'parent_doc_id': doc['parent_doc_id'],
+                'chunk_index': doc['chunk_index'],
+                'total_chunks': doc['total_chunks'],
+                'title': doc['title'],
+                'text': doc['text'],
+                'url': doc['url'],
+                'doc_date': doc['doc_date'],
+                'doc_category': doc['doc_category'],
+                'doc_sentiment': doc['doc_sentiment'],
+                'doc_source': doc['doc_source'],
+                'content_length': doc['content_length']
+            }
+            for doc in documents
+        ])
+        
+        processed_csv = processed_df.to_csv(index=False)
+        processed_key = f"rag/processed/processed_for_embedding_{date_str}.csv"
+        
+        s3_hook.load_string(
+            string_data=processed_csv,
+            key=processed_key,
+            bucket_name=bucket_name,
+            replace=True
+        )
+        logging.info(f"💾 Saved processed data: {processed_key}")
+        
+        # Save prepared documents as JSON (for internal use)
+        docs_json = json.dumps(documents, ensure_ascii=False, indent=2)
+        docs_key = f"rag/staging/prepared_documents_{date_str}.json"
+        
+        s3_hook.load_string(
+            string_data=docs_json,
+            key=docs_key,
+            bucket_name=bucket_name,
+            replace=True
+        )
+        
+        # Save metadata
+        metadata = {
+            'processing_date': date_str,
+            'total_articles': len(filtered_df),
+            'total_chunks': len(documents),
+            'avg_chunks_per_article': len(documents) / len(filtered_df),
+            'categories': filtered_df['doc_category'].value_counts().to_dict(),
+            'sentiments': filtered_df['doc_sentiment'].value_counts().to_dict(),
+            '_created_at_utc': pd.Timestamp.utcnow().isoformat() + 'Z'
+        }
+        
+        metadata_key = f"rag/metadata/preparation_meta_{date_str}.json"
+        s3_hook.load_string(
+            string_data=json.dumps(metadata, ensure_ascii=False, indent=2),
+            key=metadata_key,
+            bucket_name=bucket_name,
+            replace=True
+        )
+        
+        # Push to XCom for next task
+        context['task_instance'].xcom_push(key='documents_prepared', value=len(documents))
+        
+        result = {
+            'documents_prepared': len(documents),
+            'articles_processed': len(filtered_df),
+            'execution_date': date_str
+        }
+        
+        logging.info(f"✅ Document preparation completed: {result}")
+        return result
         
     except Exception as e:
-        logging.error(f"💥 RAG extraction failed: {str(e)}")
+        logging.error(f"💥 Document preparation failed: {str(e)}")
         raise
 
-def create_vietnamese_embeddings(**context):
-    """Create Vietnamese SBERT embeddings for news articles"""
+def create_real_embeddings(**context):
+    """
+    Create REAL Vietnamese SBERT embeddings
+    Uses: keepitreal/vietnamese-sbert model
+    """
     try:
-        # Use current date for real-time processing
         from datetime import datetime
         date_str = datetime.now().strftime('%Y-%m-%d')
-        execution_date = context.get('execution_date', datetime.now())
         
-        logging.info(f"🤖 Creating Vietnamese SBERT embeddings for {date_str}")
+        logging.info(f"🤖 Creating REAL Vietnamese SBERT embeddings - {date_str}")
         
         from airflow.providers.amazon.aws.hooks.s3 import S3Hook
-        import pandas as pd
-        import numpy as np
         import json
+        import numpy as np
+        import sys
+        
+        # Add utils to path
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'utils'))
+        from embedding_utils import VietnameseEmbedder
         
         # Initialize S3
         s3_hook = S3Hook(aws_conn_id='aws_default')
         bucket_name = os.getenv('S3_BUCKET', 'bankanalystportfolio')
         
-        try:
-            # Check for staged news data
-            staging_key = f"rag/staging/news_for_embedding_{date_str}.csv"
-            
-            if not s3_hook.check_for_key(key=staging_key, bucket_name=bucket_name):
-                logging.warning(f"⚠️ No staged news data for embedding")
-                return {'embeddings_created': 0, 'execution_date': date_str}
-            
-            # Load staged news
-            csv_content = s3_hook.read_key(key=staging_key, bucket_name=bucket_name)
-            news_df = pd.read_csv(pd.StringIO(csv_content))
-            
-            if len(news_df) == 0:
-                logging.warning(f"⚠️ No news articles to embed")
-                return {'embeddings_created': 0, 'execution_date': date_str}
-            
-            logging.info(f"📝 Creating embeddings for {len(news_df)} articles")
-            
-            # For production, you would use Vietnamese SBERT model
-            # Here we simulate the embedding process
-            try:
-                # Simulated Vietnamese SBERT embeddings
-                # In production: from sentence_transformers import SentenceTransformer
-                # model = SentenceTransformer('keepitreal/vietnamese-sbert')
-                
-                # Simulate embedding creation (384 dimensions for Vietnamese SBERT)
-                embedding_dimension = 384
-                embeddings = []
-                
-                for idx, row in news_df.iterrows():
-                    text = row['embedding_text']
-                    
-                    # Simulate embedding based on text characteristics
-                    # In production: embedding = model.encode(text)
-                    text_hash = hash(text)
-                    np.random.seed(abs(text_hash) % (2**32))  # Deterministic "embedding"
-                    simulated_embedding = np.random.normal(0, 1, embedding_dimension)
-                    
-                    # Normalize embedding
-                    simulated_embedding = simulated_embedding / np.linalg.norm(simulated_embedding)
-                    
-                    embeddings.append(simulated_embedding.tolist())
-                
-                logging.info(f"🎯 Generated {len(embeddings)} Vietnamese embeddings")
-                
-                # Prepare embedding data
-                embedding_data = {
-                    'processing_date': date_str,
-                    'model_name': 'vietnamese-sbert-simulated',
-                    'embedding_dimension': embedding_dimension,
-                    'total_documents': len(news_df),
-                    'documents': []
-                }
-                
-                for idx, row in news_df.iterrows():
-                    doc_embedding = {
-                        'doc_id': row['doc_id'],
-                        'title': row['title'],
-                        'url': row['url'],
-                        'doc_date': row['doc_date'],
-                        'doc_category': row['doc_category'],
-                        'doc_sentiment': row['doc_sentiment'],
-                        'doc_source': row['doc_source'],
-                        'content_length': int(row['content_length']),
-                        'embedding': embeddings[idx]
-                    }
-                    embedding_data['documents'].append(doc_embedding)
-                
-                # Save embeddings as JSON
-                embeddings_key = f"rag/embeddings/vietnamese_embeddings_{date_str}.json"
-                s3_hook.load_string(
-                    string_data=json.dumps(embedding_data, ensure_ascii=False, indent=2),
-                    key=embeddings_key,
-                    bucket_name=bucket_name,
-                    replace=True
-                )
-                
-                # Create embedding summary
-                embedding_summary = {
-                    'processing_date': date_str,
-                    'total_embeddings': len(embeddings),
-                    'embedding_dimension': embedding_dimension,
-                    'model_used': 'vietnamese-sbert-simulated',
-                    'categories_embedded': news_df['doc_category'].value_counts().to_dict(),
-                    'avg_content_length': float(news_df['content_length'].mean()),
-                    '_created_at_utc': pd.Timestamp.utcnow().isoformat() + 'Z'
-                }
-                
-                summary_key = f"rag/metadata/embeddings_summary_{date_str}.json"
-                s3_hook.load_string(
-                    string_data=json.dumps(embedding_summary, ensure_ascii=False, indent=2),
-                    key=summary_key,
-                    bucket_name=bucket_name,
-                    replace=True
-                )
-                
-                result = {
-                    'embeddings_created': len(embeddings),
-                    'embedding_dimension': embedding_dimension,
-                    'execution_date': date_str
-                }
-                
-                logging.info(f"✅ Vietnamese embeddings created: {result}")
-                return result
-                
-            except Exception as embedding_error:
-                logging.error(f"❌ Embedding creation failed: {str(embedding_error)}")
-                return {'embeddings_created': 0, 'execution_date': date_str}
-            
-        except Exception as e:
-            logging.error(f"❌ Embedding process failed: {str(e)}")
+        # Load prepared documents
+        docs_key = f"rag/staging/prepared_documents_{date_str}.json"
+        
+        if not s3_hook.check_for_key(key=docs_key, bucket_name=bucket_name):
+            logging.warning("⚠️ No prepared documents found")
+            context['task_instance'].xcom_push(key='embeddings_created', value=0)
             return {'embeddings_created': 0, 'execution_date': date_str}
         
+        docs_content = s3_hook.read_key(key=docs_key, bucket_name=bucket_name)
+        documents = json.loads(docs_content)
+        
+        if len(documents) == 0:
+            logging.warning("⚠️ No documents to embed")
+            context['task_instance'].xcom_push(key='embeddings_created', value=0)
+            return {'embeddings_created': 0, 'execution_date': date_str}
+        
+        logging.info(f"📝 Creating embeddings for {len(documents)} document chunks")
+        
+        # Initialize Vietnamese SBERT embedder
+        embedder = VietnameseEmbedder(model_name="keepitreal/vietnamese-sbert")
+        embedder.load_model()
+        
+        # Extract texts
+        texts = [doc['text'] for doc in documents]
+        
+        # Create embeddings in batches
+        embeddings = embedder.encode_texts(
+            texts,
+            batch_size=32,
+            show_progress=True
+        )
+        
+        logging.info(f"✅ Created {len(embeddings)} embeddings (shape: {embeddings.shape})")
+        
+        # Prepare embedding data for storage
+        embedding_data = {
+            'processing_date': date_str,
+            'model_name': embedder.model_name,
+            'embedding_dimension': embedder.embedding_dim,
+            'total_documents': len(documents),
+            'documents': []
+        }
+        
+        # Add embeddings to documents
+        for doc, embedding in zip(documents, embeddings):
+            doc_with_embedding = doc.copy()
+            doc_with_embedding['embedding'] = embedding.tolist()
+            embedding_data['documents'].append(doc_with_embedding)
+        
+        # Save embeddings
+        embeddings_key = f"rag/embeddings/vietnamese_embeddings_{date_str}.json"
+        s3_hook.load_string(
+            string_data=json.dumps(embedding_data, ensure_ascii=False),  # No indent to save space
+            key=embeddings_key,
+            bucket_name=bucket_name,
+            replace=True
+        )
+        
+        # Save embedding summary
+        summary = {
+            'processing_date': date_str,
+            'total_embeddings': len(embeddings),
+            'embedding_dimension': embedder.embedding_dim,
+            'model_used': embedder.model_name,
+            'embedding_shape': list(embeddings.shape),
+            '_created_at_utc': datetime.utcnow().isoformat() + 'Z'
+        }
+        
+        summary_key = f"rag/metadata/embeddings_summary_{date_str}.json"
+        s3_hook.load_string(
+            string_data=json.dumps(summary, ensure_ascii=False, indent=2),
+            key=summary_key,
+            bucket_name=bucket_name,
+            replace=True
+        )
+        
+        # Push to XCom
+        context['task_instance'].xcom_push(key='embeddings_created', value=len(embeddings))
+        
+        result = {
+            'embeddings_created': len(embeddings),
+            'embedding_dimension': embedder.embedding_dim,
+            'model_used': embedder.model_name,
+            'execution_date': date_str
+        }
+        
+        logging.info(f"✅ Real Vietnamese embeddings created: {result}")
+        return result
+        
     except Exception as e:
-        logging.error(f"💥 Vietnamese embedding creation failed: {str(e)}")
+        logging.error(f"💥 Embedding creation failed: {str(e)}")
         raise
 
-def update_vector_database(**context):
-    """Update FAISS vector database with new embeddings"""
+def update_faiss_vectordb(**context):
+    """
+    Update REAL FAISS vector database
+    With deduplication and proper indexing
+    """
     try:
-        # Use current date for real-time processing
         from datetime import datetime
         date_str = datetime.now().strftime('%Y-%m-%d')
-        execution_date = context.get('execution_date', datetime.now())
         
-        logging.info(f"🗄️ Updating FAISS vector database for {date_str}")
+        logging.info(f"🗄️ Updating FAISS vector database - {date_str}")
         
         from airflow.providers.amazon.aws.hooks.s3 import S3Hook
-        import pandas as pd
-        import numpy as np
         import json
+        import numpy as np
+        import sys
+        
+        # Add utils to path
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'utils'))
+        from vectordb_utils import create_s3_vectordb_manager, save_vectordb_to_s3
         
         # Initialize S3
         s3_hook = S3Hook(aws_conn_id='aws_default')
         bucket_name = os.getenv('S3_BUCKET', 'bankanalystportfolio')
         
-        try:
-            # Load new embeddings
-            embeddings_key = f"rag/embeddings/vietnamese_embeddings_{date_str}.json"
-            
-            if not s3_hook.check_for_key(key=embeddings_key, bucket_name=bucket_name):
-                logging.warning(f"⚠️ No embeddings found for vector database update")
-                return {'vectors_added': 0, 'execution_date': date_str}
-            
-            embeddings_content = s3_hook.read_key(key=embeddings_key, bucket_name=bucket_name)
-            embeddings_data = json.loads(embeddings_content)
-            
-            documents = embeddings_data.get('documents', [])
-            if len(documents) == 0:
-                logging.warning(f"⚠️ No documents to add to vector database")
-                return {'vectors_added': 0, 'execution_date': date_str}
-            
-            logging.info(f"📊 Processing {len(documents)} documents for vector database")
-            
-            # Simulate FAISS vector database operations
-            # In production: import faiss
-            
-            try:
-                # Load existing vector database metadata
-                vectordb_meta_key = "rag/vectordb/database_metadata.json"
-                
-                if s3_hook.check_for_key(key=vectordb_meta_key, bucket_name=bucket_name):
-                    meta_content = s3_hook.read_key(key=vectordb_meta_key, bucket_name=bucket_name)
-                    vectordb_meta = json.loads(meta_content)
-                    existing_count = vectordb_meta.get('total_vectors', 0)
-                    logging.info(f"📈 Existing vectors in database: {existing_count}")
-                else:
-                    vectordb_meta = {
-                        'database_created': pd.Timestamp.utcnow().isoformat() + 'Z',
-                        'total_vectors': 0,
-                        'embedding_dimension': embeddings_data['embedding_dimension'],
-                        'last_update': None,
-                        'daily_updates': []
-                    }
-                    existing_count = 0
-                
-                # Simulate adding vectors to FAISS index
-                # In production:
-                # index = faiss.read_index("path_to_index")
-                # vectors = np.array([doc['embedding'] for doc in documents])
-                # index.add(vectors)
-                # faiss.write_index(index, "path_to_index")
-                
-                new_vectors_count = len(documents)
-                total_vectors = existing_count + new_vectors_count
-                
-                # Update vector database metadata
-                vectordb_meta.update({
-                    'total_vectors': total_vectors,
-                    'last_update': pd.Timestamp.utcnow().isoformat() + 'Z',
-                    'embedding_dimension': embeddings_data['embedding_dimension']
-                })
-                
-                # Add daily update record
-                daily_update = {
-                    'date': date_str,
-                    'vectors_added': new_vectors_count,
-                    'categories': {},
-                    'sentiments': {}
-                }
-                
-                # Count categories and sentiments
-                for doc in documents:
-                    category = doc.get('doc_category', 'UNKNOWN')
-                    sentiment = doc.get('doc_sentiment', 'UNKNOWN')
-                    daily_update['categories'][category] = daily_update['categories'].get(category, 0) + 1
-                    daily_update['sentiments'][sentiment] = daily_update['sentiments'].get(sentiment, 0) + 1
-                
-                vectordb_meta['daily_updates'].append(daily_update)
-                
-                # Keep only last 30 days of updates
-                vectordb_meta['daily_updates'] = vectordb_meta['daily_updates'][-30:]
-                
-                # Save updated metadata
-                s3_hook.load_string(
-                    string_data=json.dumps(vectordb_meta, ensure_ascii=False, indent=2),
-                    key=vectordb_meta_key,
-                    bucket_name=bucket_name,
-                    replace=True
-                )
-                
-                # Create document index for search
-                document_index = {
-                    'processing_date': date_str,
-                    'documents': []
-                }
-                
-                for idx, doc in enumerate(documents):
-                    doc_index = {
-                        'vector_id': existing_count + idx,  # Simulated vector ID
-                        'doc_id': doc['doc_id'],
-                        'title': doc['title'],
-                        'url': doc['url'],
-                        'doc_date': doc['doc_date'],
-                        'doc_category': doc['doc_category'],
-                        'doc_sentiment': doc['doc_sentiment'],
-                        'doc_source': doc['doc_source'],
-                        'content_length': doc['content_length']
-                    }
-                    document_index['documents'].append(doc_index)
-                
-                # Save document index
-                index_key = f"rag/vectordb/document_index_{date_str}.json"
-                s3_hook.load_string(
-                    string_data=json.dumps(document_index, ensure_ascii=False, indent=2),
-                    key=index_key,
-                    bucket_name=bucket_name,
-                    replace=True
-                )
-                
-                result = {
-                    'vectors_added': new_vectors_count,
-                    'total_vectors': total_vectors,
-                    'execution_date': date_str
-                }
-                
-                logging.info(f"✅ Vector database updated successfully: {result}")
-                return result
-                
-            except Exception as vectordb_error:
-                logging.error(f"❌ Vector database update failed: {str(vectordb_error)}")
-                return {'vectors_added': 0, 'execution_date': date_str}
-            
-        except Exception as e:
-            logging.error(f"❌ Vector database process failed: {str(e)}")
+        # Load embeddings
+        embeddings_key = f"rag/embeddings/vietnamese_embeddings_{date_str}.json"
+        
+        if not s3_hook.check_for_key(key=embeddings_key, bucket_name=bucket_name):
+            logging.warning("⚠️ No embeddings found")
+            context['task_instance'].xcom_push(key='vectors_added', value=0)
             return {'vectors_added': 0, 'execution_date': date_str}
         
+        embeddings_content = s3_hook.read_key(key=embeddings_key, bucket_name=bucket_name)
+        embeddings_data = json.loads(embeddings_content)
+        
+        documents = embeddings_data.get('documents', [])
+        if len(documents) == 0:
+            logging.warning("⚠️ No documents to index")
+            context['task_instance'].xcom_push(key='vectors_added', value=0)
+            return {'vectors_added': 0, 'execution_date': date_str}
+        
+        logging.info(f"📊 Processing {len(documents)} documents for FAISS indexing")
+        
+        # Prepare vectors and metadata
+        embeddings_array = np.array([doc['embedding'] for doc in documents], dtype='float32')
+        
+        # Auto-detect embedding dimension from actual data
+        actual_embedding_dim = embeddings_array.shape[1] if len(embeddings_array.shape) == 2 else len(embeddings_array[0])
+        logging.info(f"🔍 Detected embedding dimension: {actual_embedding_dim}")
+        logging.info(f"🔍 Embeddings array shape: {embeddings_array.shape}")
+        
+        # Load or create vector database with correct dimension
+        vectordb = create_s3_vectordb_manager(
+            s3_hook=s3_hook,
+            bucket_name=bucket_name,
+            vectordb_prefix="rag/vectordb",
+            embedding_dim=actual_embedding_dim  # Use detected dimension
+        )
+        
+        logging.info(f"🔍 VectorDB initialized with dimension: {vectordb.embedding_dim}")
+        
+        # Validate dimensions match
+        if len(embeddings_array.shape) != 2:
+            raise ValueError(f"Embeddings must be 2D array, got shape: {embeddings_array.shape}")
+        
+        if embeddings_array.shape[1] != vectordb.embedding_dim:
+            raise ValueError(
+                f"Embedding dimension mismatch: got {embeddings_array.shape[1]}, "
+                f"expected {vectordb.embedding_dim}"
+            )
+        
+        # Document metadata (without embeddings to save memory)
+        doc_metadata = []
+        for doc in documents:
+            meta = {k: v for k, v in doc.items() if k != 'embedding'}
+            doc_metadata.append(meta)
+        
+        # Add to FAISS index (with deduplication)
+        vectors_added = vectordb.add_vectors(
+            embeddings=embeddings_array,
+            documents=doc_metadata,
+            check_duplicates=True  # Skip duplicates
+        )
+        
+        logging.info(f"✅ Added {vectors_added} vectors to FAISS (skipped duplicates)")
+        
+        # Save updated database to S3
+        save_vectordb_to_s3(
+            vectordb=vectordb,
+            s3_hook=s3_hook,
+            bucket_name=bucket_name,
+            vectordb_prefix="rag/vectordb"
+        )
+        
+        # Get database stats
+        stats = vectordb.get_stats()
+        
+        # ===== SAVE EMBEDDINGS INFO TO VECTORDB FOLDER =====
+        # Create embeddings_info.json with comprehensive information
+        embeddings_info = {
+            'last_update': date_str,
+            'last_update_utc': datetime.utcnow().isoformat() + 'Z',
+            'model_name': 'keepitreal/vietnamese-sbert',
+            'embedding_dimension': stats.get('embedding_dim', 384),
+            'total_vectors': stats['total_vectors'],
+            'vectors_added_today': vectors_added,
+            'total_documents': stats.get('total_documents', 0),
+            'unique_doc_ids': stats.get('unique_doc_ids', 0),
+            'index_type': stats.get('index_type', 'IndexFlatIP'),
+            'categories_distribution': stats.get('categories', {}),
+            'sentiments_distribution': stats.get('sentiments', {}),
+            'sources_distribution': stats.get('sources', {}),
+            'vectordb_files': {
+                'index': 'rag/vectordb/faiss_index.bin',
+                'metadata': 'rag/vectordb/faiss_metadata.pkl',
+                'info': 'rag/vectordb/embeddings_info.json'
+            },
+            'pipeline_version': '2.0',
+            'description': 'Vietnamese financial news vector database using SBERT and FAISS'
+        }
+        
+        embeddings_info_key = "rag/vectordb/embeddings_info.json"
+        s3_hook.load_string(
+            string_data=json.dumps(embeddings_info, ensure_ascii=False, indent=2),
+            key=embeddings_info_key,
+            bucket_name=bucket_name,
+            replace=True
+        )
+        logging.info(f"💾 Saved embeddings info: {embeddings_info_key}")
+        
+        # Save database stats (legacy format for backward compatibility)
+        stats['last_update'] = date_str
+        stats['_updated_at_utc'] = datetime.utcnow().isoformat() + 'Z'
+        
+        stats_key = "rag/vectordb/database_stats.json"
+        s3_hook.load_string(
+            string_data=json.dumps(stats, ensure_ascii=False, indent=2),
+            key=stats_key,
+            bucket_name=bucket_name,
+            replace=True
+        )
+        
+        # Push to XCom
+        context['task_instance'].xcom_push(key='vectors_added', value=vectors_added)
+        
+        result = {
+            'vectors_added': vectors_added,
+            'total_vectors': stats['total_vectors'],
+            'execution_date': date_str
+        }
+        
+        logging.info(f"✅ FAISS vector database updated: {result}")
+        return result
+        
     except Exception as e:
-        logging.error(f"💥 FAISS vector database update failed: {str(e)}")
+        logging.error(f"💥 FAISS update failed: {str(e)}")
         raise
 
-def validate_rag_pipeline(**context):
-    """Validate RAG pipeline outputs"""
+def validate_and_test_search(**context):
+    """
+    Validate RAG pipeline and test search functionality
+    """
     try:
-        # Use current date for real-time processing
         from datetime import datetime
+        import pandas as pd
         date_str = datetime.now().strftime('%Y-%m-%d')
-        execution_date = context.get('execution_date', datetime.now())
         
-        logging.info(f"🔍 Validating RAG pipeline for {date_str}")
+        logging.info(f"🔍 Validating RAG pipeline and testing search - {date_str}")
         
         from airflow.providers.amazon.aws.hooks.s3 import S3Hook
         import json
+        import sys
+        
+        # Add utils to path
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'utils'))
+        from vectordb_utils import create_s3_vectordb_manager
+        from embedding_utils import VietnameseEmbedder
         
         # Initialize S3
         s3_hook = S3Hook(aws_conn_id='aws_default')
@@ -458,141 +587,140 @@ def validate_rag_pipeline(**context):
             'components_checked': [],
             'errors': [],
             'warnings': [],
-            'metrics': {}
+            'metrics': {},
+            'search_tests': []
         }
         
+        # Pull XCom data
+        ti = context['task_instance']
+        docs_prepared = ti.xcom_pull(key='documents_prepared', task_ids='extract_and_prepare_documents')
+        embeddings_created = ti.xcom_pull(key='embeddings_created', task_ids='create_real_embeddings')
+        vectors_added = ti.xcom_pull(key='vectors_added', task_ids='update_faiss_vectordb')
+        
+        # Validate pipeline steps
+        if docs_prepared and docs_prepared > 0:
+            validation_results['components_checked'].append('document_preparation')
+            validation_results['metrics']['documents_prepared'] = docs_prepared
+        else:
+            validation_results['errors'].append("No documents prepared")
+            validation_results['pipeline_status'] = 'FAIL'
+        
+        if embeddings_created and embeddings_created > 0:
+            validation_results['components_checked'].append('embeddings')
+            validation_results['metrics']['embeddings_created'] = embeddings_created
+        else:
+            validation_results['errors'].append("No embeddings created")
+            validation_results['pipeline_status'] = 'FAIL'
+        
+        if vectors_added and vectors_added > 0:
+            validation_results['components_checked'].append('vector_database')
+            validation_results['metrics']['vectors_added'] = vectors_added
+        else:
+            validation_results['warnings'].append("No new vectors added (might be duplicates)")
+        
+        # Test search functionality
         try:
-            # Check news extraction
-            staging_key = f"rag/staging/news_for_embedding_{date_str}.csv"
-            if s3_hook.check_for_key(key=staging_key, bucket_name=bucket_name):
-                validation_results['components_checked'].append('news_extraction')
-                logging.info("✅ News extraction validated")
-            else:
-                validation_results['errors'].append("Missing news extraction output")
-                validation_results['pipeline_status'] = 'FAIL'
+            logging.info("🔎 Testing search functionality...")
             
-            # Check embeddings
-            embeddings_key = f"rag/embeddings/vietnamese_embeddings_{date_str}.json"
-            if s3_hook.check_for_key(key=embeddings_key, bucket_name=bucket_name):
-                try:
-                    embeddings_content = s3_hook.read_key(key=embeddings_key, bucket_name=bucket_name)
-                    embeddings_data = json.loads(embeddings_content)
-                    
-                    validation_results['components_checked'].append('embeddings')
-                    validation_results['metrics']['embeddings_count'] = embeddings_data.get('total_documents', 0)
-                    validation_results['metrics']['embedding_dimension'] = embeddings_data.get('embedding_dimension', 0)
-                    
-                    logging.info(f"✅ Embeddings validated: {validation_results['metrics']['embeddings_count']} vectors")
-                except Exception as e:
-                    validation_results['errors'].append(f"Invalid embeddings format: {str(e)}")
-                    validation_results['pipeline_status'] = 'FAIL'
-            else:
-                validation_results['errors'].append("Missing embeddings output")
-                validation_results['pipeline_status'] = 'FAIL'
-            
-            # Check vector database
-            vectordb_meta_key = "rag/vectordb/database_metadata.json"
-            if s3_hook.check_for_key(key=vectordb_meta_key, bucket_name=bucket_name):
-                try:
-                    meta_content = s3_hook.read_key(key=vectordb_meta_key, bucket_name=bucket_name)
-                    vectordb_meta = json.loads(meta_content)
-                    
-                    validation_results['components_checked'].append('vector_database')
-                    validation_results['metrics']['total_vectors'] = vectordb_meta.get('total_vectors', 0)
-                    validation_results['metrics']['last_update'] = vectordb_meta.get('last_update', 'Unknown')
-                    
-                    # Check if today's update is recorded
-                    daily_updates = vectordb_meta.get('daily_updates', [])
-                    today_update = next((update for update in daily_updates if update['date'] == date_str), None)
-                    
-                    if today_update:
-                        validation_results['metrics']['vectors_added_today'] = today_update['vectors_added']
-                        logging.info(f"✅ Vector database validated: {today_update['vectors_added']} vectors added today")
-                    else:
-                        validation_results['warnings'].append("No daily update record found")
-                    
-                except Exception as e:
-                    validation_results['errors'].append(f"Invalid vector database metadata: {str(e)}")
-                    validation_results['pipeline_status'] = 'FAIL'
-            else:
-                validation_results['errors'].append("Missing vector database metadata")
-                validation_results['pipeline_status'] = 'FAIL'
-            
-            # Check document index
-            index_key = f"rag/vectordb/document_index_{date_str}.json"
-            if s3_hook.check_for_key(key=index_key, bucket_name=bucket_name):
-                validation_results['components_checked'].append('document_index')
-                logging.info("✅ Document index validated")
-            else:
-                validation_results['warnings'].append("Missing document index")
-            
-            # Save validation results
-            validation_results['_created_at_utc'] = pd.Timestamp.utcnow().isoformat() + 'Z'
-            validation_key = f"rag/metadata/validation_results_{date_str}.json"
-            
-            s3_hook.load_string(
-                string_data=json.dumps(validation_results, ensure_ascii=False, indent=2),
-                key=validation_key,
+            # Load vector database
+            vectordb = create_s3_vectordb_manager(
+                s3_hook=s3_hook,
                 bucket_name=bucket_name,
-                replace=True
+                vectordb_prefix="rag/vectordb"
             )
             
-            # Log summary
-            status_emoji = "✅" if validation_results['pipeline_status'] == 'PASS' else "❌"
-            logging.info(f"{status_emoji} RAG pipeline validation: {validation_results['pipeline_status']}")
+            # Initialize embedder for query
+            embedder = VietnameseEmbedder(model_name="keepitreal/vietnamese-sbert")
+            embedder.load_model()
             
-            if validation_results['errors']:
-                logging.error(f"❌ Validation errors: {validation_results['errors']}")
+            # Test queries
+            test_queries = [
+                "Lãi suất ngân hàng",
+                "Thị trường chứng khoán",
+                "Kinh tế vĩ mô Việt Nam"
+            ]
             
-            if validation_results['warnings']:
-                logging.warning(f"⚠️ Validation warnings: {validation_results['warnings']}")
+            for query in test_queries:
+                # Create query embedding
+                query_embedding = embedder.encode_single(query)
+                
+                # Search
+                results = vectordb.search(
+                    query_embedding=query_embedding,
+                    top_k=3
+                )
+                
+                test_result = {
+                    'query': query,
+                    'results_found': len(results),
+                    'top_result': results[0]['title'] if results else None,
+                    'top_score': results[0]['similarity_score'] if results else None
+                }
+                
+                validation_results['search_tests'].append(test_result)
+                logging.info(f"✅ Search test: {query} -> {len(results)} results")
             
-            logging.info(f"📊 RAG metrics: {validation_results['metrics']}")
+            validation_results['components_checked'].append('search_functionality')
             
-            return validation_results
-            
-        except Exception as validation_error:
-            validation_results['errors'].append(f"Validation process error: {str(validation_error)}")
-            validation_results['pipeline_status'] = 'FAIL'
-            logging.error(f"❌ RAG validation failed: {str(validation_error)}")
-            return validation_results
+        except Exception as search_error:
+            validation_results['warnings'].append(f"Search test failed: {str(search_error)}")
+            logging.warning(f"⚠️ Search test failed: {str(search_error)}")
+        
+        # Save validation results
+        validation_results['_created_at_utc'] = datetime.utcnow().isoformat() + 'Z'
+        validation_key = f"rag/metadata/validation_results_{date_str}.json"
+        
+        s3_hook.load_string(
+            string_data=json.dumps(validation_results, ensure_ascii=False, indent=2),
+            key=validation_key,
+            bucket_name=bucket_name,
+            replace=True
+        )
+        
+        # Log summary
+        status_emoji = "✅" if validation_results['pipeline_status'] == 'PASS' else "❌"
+        logging.info(f"{status_emoji} RAG pipeline validation: {validation_results['pipeline_status']}")
+        logging.info(f"📊 Metrics: {validation_results['metrics']}")
+        logging.info(f"� Search tests: {len(validation_results['search_tests'])} completed")
+        
+        return validation_results
         
     except Exception as e:
-        logging.error(f"💥 RAG pipeline validation failed: {str(e)}")
+        logging.error(f"💥 Validation failed: {str(e)}")
         raise
 
 # Task definitions
-extract_news_task = PythonOperator(
-    task_id='extract_processed_news',
-    python_callable=extract_processed_news,
+prepare_documents_task = PythonOperator(
+    task_id='extract_and_prepare_documents',
+    python_callable=extract_and_prepare_documents,
     dag=dag,
     retries=2,
     retry_delay=timedelta(minutes=5)
 )
 
 create_embeddings_task = PythonOperator(
-    task_id='create_vietnamese_embeddings',
-    python_callable=create_vietnamese_embeddings,
+    task_id='create_real_embeddings',
+    python_callable=create_real_embeddings,
     dag=dag,
     retries=2,
     retry_delay=timedelta(minutes=5)
 )
 
 update_vectordb_task = PythonOperator(
-    task_id='update_vector_database',
-    python_callable=update_vector_database,
+    task_id='update_faiss_vectordb',
+    python_callable=update_faiss_vectordb,
     dag=dag,
     retries=2,
     retry_delay=timedelta(minutes=5)
 )
 
-validate_rag_task = PythonOperator(
-    task_id='validate_rag_pipeline',
-    python_callable=validate_rag_pipeline,
+validate_task = PythonOperator(
+    task_id='validate_and_test_search',
+    python_callable=validate_and_test_search,
     dag=dag,
     retries=1,
     retry_delay=timedelta(minutes=2)
 )
 
 # Task dependencies
-extract_news_task >> create_embeddings_task >> update_vectordb_task >> validate_rag_task
+prepare_documents_task >> create_embeddings_task >> update_vectordb_task >> validate_task

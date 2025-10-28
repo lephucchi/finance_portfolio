@@ -31,6 +31,12 @@ pyvi>=0.1.0               # Vietnamese text processing
 # Machine Learning
 scikit-learn>=1.3.0       # ML algorithms
 
+# RAG System - Vietnamese NLP & Vector Database
+sentence-transformers>=2.2.0  # Vietnamese SBERT embeddings
+faiss-cpu>=1.7.4          # Vector similarity search (CPU version)
+# faiss-gpu>=1.7.4        # Uncomment for GPU support
+torch>=2.0.0              # PyTorch (required by sentence-transformers)
+
 # Spark (optional for big data)
 pyspark>=3.5.0            # Spark Python API
 pyarrow>=14.0.0           # Columnar data

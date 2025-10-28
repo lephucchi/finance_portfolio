@@ -36,6 +36,13 @@ USER airflow
 COPY requirements.txt /requirements.txt
 RUN pip install --no-cache-dir -r /requirements.txt || true
 
+# Install RAG System dependencies explicitly
+RUN pip install --no-cache-dir \
+    sentence-transformers>=2.2.0 \
+    faiss-cpu>=1.7.4 \
+    torch>=2.0.0 \
+    pyarrow>=14.0.0
+
 # Set Spark configurations
 ENV SPARK_CONF_DIR=$SPARK_HOME/conf
 ENV PYSPARK_PYTHON=python3

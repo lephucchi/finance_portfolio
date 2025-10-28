@@ -18,14 +18,17 @@ USER airflow
 COPY requirements.txt /requirements.txt
 RUN pip install --no-cache-dir -r /requirements.txt
 
-# Install Vietnamese stock analysis packages
+# Install Vietnamese stock analysis and RAG packages
 RUN pip install --no-cache-dir \
     vnstock3==3.2.1 \
     ipython \
     boto3 \
     s3fs \
     findspark \
-    faiss-cpu
+    sentence-transformers>=2.2.0 \
+    faiss-cpu>=1.7.4 \
+    torch>=2.0.0 \
+    pyarrow>=14.0.0
 
 # Copy the DAGs and plugins
 COPY airflow/dags /opt/airflow/dags
