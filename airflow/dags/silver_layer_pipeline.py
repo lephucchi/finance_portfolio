@@ -31,7 +31,7 @@ import threading
 default_args = {
     'owner': 'finance_portfolio',
     'depends_on_past': False,
-    'start_date': datetime(2025, 10, 27),  # Current date to avoid future execution date issues
+    'start_date': datetime(2025, 10, 29),  # Current date to avoid future execution date issues
     'email_on_failure': True,
     'email_on_retry': False,
     'retries': 3,

@@ -129,3 +129,34 @@ async def get_sector_performance(
     except Exception as e:
         logger.error(f"Failed to get sector performance: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get(
+    "/debug/check-data",
+    summary="Debug: Check available data",
+    description="Check what data is available in market_dashboard table",
+)
+async def debug_check_data(
+    service: MarketService = Depends(get_market_service),
+) -> ResponseModel:
+    """
+    Debug endpoint to check available data.
+    
+    Args:
+        service: Market service instance
+        
+    Returns:
+        ResponseModel: Sample data and date ranges
+    """
+    try:
+        data = service.debug_check_available_data()
+
+        return ResponseModel(
+            success=True,
+            data=data,
+            message="Debug data retrieved successfully",
+        )
+
+    except Exception as e:
+        logger.error(f"Failed to check data: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))

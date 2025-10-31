@@ -65,7 +65,9 @@ class MarketService:
 
             # Execute query
             logger.info(f"Fetching market data from {start_date} to {end_date}")
+            logger.info(f"SQL Query: {sql}")
             results = self.athena.query(sql)
+            logger.info(f"Query returned {len(results)} rows")
 
             # Cache results
             self.supabase.cache_result(query_hash, sql, results)
@@ -104,7 +106,8 @@ class MarketService:
                     volatility_7d
                 FROM fizbert.market_dashboard
                 WHERE symbol = '{symbol}'
-                    AND partition_date BETWEEN '{start_date}' AND '{end_date}'
+                    AND partition_date >= '{start_date}' 
+                    AND partition_date <= '{end_date}'
                 ORDER BY data_date DESC
             """
 
@@ -122,31 +125,107 @@ class MarketService:
     ) -> list[dict[str, Any]]:
         """
         Get sector performance data.
+        
+        NOTE: This table does not exist in fizbert database yet.
+        Available tables: macro_features, market_dashboard, risk_metrics, sentiment_features
 
         Args:
             start_date: Start date
             end_date: End date
 
         Returns:
-            list: Sector performance data
+            list: Sector performance data (currently returns empty list)
         """
         try:
-            sql = f"""
-                SELECT 
-                    data_date,
-                    sector,
-                    avg_price_change_pct,
-                    avg_volatility
-                FROM fizbert.sector_performance
-                WHERE partition_date BETWEEN '{start_date}' AND '{end_date}'
-                ORDER BY data_date DESC
-            """
-
-            logger.info("Fetching sector performance data")
-            return self.athena.query(sql)
+            # TODO: Table fizbert.sector_performance does not exist
+            # Need to create this table in Gold layer or compute from market_dashboard
+            logger.warning("sector_performance table does not exist in fizbert database")
+            
+            # Return empty result for now
+            return []
+            
+            # Original query (commented out until table is created):
+            # sql = f"""
+            #     SELECT 
+            #         data_date,
+            #         sector,
+            #         avg_price_change_pct,
+            #         avg_volatility
+            #     FROM fizbert.sector_performance
+            #     WHERE data_date BETWEEN DATE '{start_date}' AND DATE '{end_date}'
+            #     ORDER BY data_date DESC
+            # """
+            # 
+            # logger.info("Fetching sector performance data")
+            # return self.athena.query(sql)
 
         except Exception as e:
             logger.error(f"Failed to get sector performance: {str(e)}")
+            raise
+
+    def debug_check_available_data(self) -> dict[str, Any]:
+        """
+        Debug method to check what data is available in market_dashboard.
+        
+        Returns:
+            dict: Information about available data
+        """
+        try:
+            # Get date range
+            date_range_sql = """
+                SELECT 
+                    MIN(data_date) as min_date,
+                    MAX(data_date) as max_date,
+                    COUNT(*) as total_rows,
+                    COUNT(DISTINCT symbol) as unique_symbols,
+                    COUNT(DISTINCT data_date) as unique_dates
+                FROM fizbert.market_dashboard
+            """
+            
+            # Get sample data
+            sample_sql = """
+                SELECT 
+                    symbol,
+                    data_date,
+                    close,
+                    volume
+                FROM fizbert.market_dashboard
+                ORDER BY data_date DESC
+                LIMIT 10
+            """
+            
+            # Get distinct dates (last 30 days)
+            dates_sql = """
+                SELECT DISTINCT data_date
+                FROM fizbert.market_dashboard
+                ORDER BY data_date DESC
+                LIMIT 30
+            """
+            
+            # Check partitions
+            partitions_sql = """
+                SELECT DISTINCT partition_date
+                FROM fizbert.market_dashboard
+                ORDER BY partition_date DESC
+                LIMIT 20
+            """
+            
+            logger.info("Fetching debug information")
+            date_info = self.athena.query(date_range_sql)
+            sample_data = self.athena.query(sample_sql)
+            available_dates = self.athena.query(dates_sql)
+            partitions = self.athena.query(partitions_sql)
+            
+            return {
+                "date_range": date_info[0] if date_info else {},
+                "sample_data": sample_data,
+                "recent_dates": [d.get('data_date') for d in available_dates],
+                "recent_partitions": [p.get('partition_date') for p in partitions],
+                "note": "Check if data_date matches partition_date for new data"
+            }
+            
+        except Exception as e:
+            logger.error(f"Failed to check available data: {str(e)}")
             raise
 
     def _build_market_query(
@@ -171,6 +250,10 @@ class MarketService:
             symbol_list = ", ".join([f"'{s}'" for s in symbols])
             symbol_filter = f"AND symbol IN ({symbol_list})"
 
+        # NOTE: Using partition_date instead of data_date because:
+        # - Data is partitioned by date (partition_date)
+        # - data_date may not match partition_date in some cases
+        # - This ensures we query the correct partitions
         sql = f"""
             SELECT 
                 symbol,
@@ -183,7 +266,8 @@ class MarketService:
                 rsi_14,
                 volatility_7d
             FROM fizbert.market_dashboard
-            WHERE partition_date BETWEEN '{start_date}' AND '{end_date}'
+            WHERE partition_date >= '{start_date}' 
+                AND partition_date <= '{end_date}'
                 {symbol_filter}
             ORDER BY data_date DESC, symbol
         """

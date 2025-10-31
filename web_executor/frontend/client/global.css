@@ -1,0 +1,270 @@
+/** @import must precede all other statements */
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Manrope:wght@400;500;600;700&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  /**
+   * AEGIS: Lumina
+   * Clarity & Light - Dual Theme System
+   * Daybreak (Light) & Starlight (Dark)
+   */
+  :root {
+    /* DAYBREAK THEME (Light Mode) */
+    --background: 210 10% 98%;
+    --foreground: 210 8% 16%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 210 8% 16%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 210 8% 16%;
+
+    /* Ocean Blue - Primary */
+    --primary: 217 100% 44%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Light Gray - Soft background */
+    --secondary: 210 20% 94%;
+    --secondary-foreground: 210 8% 16%;
+
+    /* Muted elements */
+    --muted: 210 15% 85%;
+    --muted-foreground: 210 8% 45%;
+
+    /* Coral Red - Accent & Warnings */
+    --accent: 0 84% 60%;
+    --accent-foreground: 0 0% 100%;
+
+    /* Destructive */
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* Borders and Inputs */
+    --border: 210 15% 90%;
+    --input: 210 15% 95%;
+    --ring: 217 100% 44%;
+
+    /* Rounded corners - subtle but friendly */
+    --radius: 10px;
+
+    /* Sidebar */
+    --sidebar-background: 210 10% 98%;
+    --sidebar-foreground: 210 8% 16%;
+    --sidebar-primary: 217 100% 44%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 0 84% 60%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 210 15% 90%;
+    --sidebar-ring: 217 100% 44%;
+
+    /* Chart Colors */
+    --chart-positive: 217 100% 44%;
+    --chart-negative: 0 84% 60%;
+    --chart-neutral: 210 15% 85%;
+
+    /* Glass effect */
+    --glass-opacity: 0.7;
+    --blur-amount: 12px;
+  }
+
+  /* STARLIGHT THEME (Dark Mode) */
+  .dark {
+    --background: 210 15% 11%;
+    --foreground: 210 10% 94%;
+
+    --card: 210 12% 16%;
+    --card-foreground: 210 10% 94%;
+
+    --popover: 210 15% 11%;
+    --popover-foreground: 210 10% 94%;
+
+    /* Amber Gold - Growth & Positive */
+    --primary: 45 100% 50%;
+    --primary-foreground: 210 15% 11%;
+
+    /* Dark Gray - Subtle background */
+    --secondary: 210 12% 22%;
+    --secondary-foreground: 210 10% 94%;
+
+    /* Muted elements */
+    --muted: 210 10% 35%;
+    --muted-foreground: 210 10% 65%;
+
+    /* Galaxy Cyan - Actions */
+    --accent: 190 100% 50%;
+    --accent-foreground: 210 15% 11%;
+
+    /* Destructive */
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 210 15% 11%;
+
+    /* Borders and Inputs */
+    --border: 210 10% 25%;
+    --input: 210 12% 20%;
+    --ring: 45 100% 50%;
+
+    /* Rounded corners */
+    --radius: 10px;
+
+    /* Sidebar */
+    --sidebar-background: 210 15% 11%;
+    --sidebar-foreground: 210 10% 94%;
+    --sidebar-primary: 45 100% 50%;
+    --sidebar-primary-foreground: 210 15% 11%;
+    --sidebar-accent: 190 100% 50%;
+    --sidebar-accent-foreground: 210 15% 11%;
+    --sidebar-border: 210 10% 25%;
+    --sidebar-ring: 45 100% 50%;
+
+    /* Chart Colors */
+    --chart-positive: 45 100% 50%;
+    --chart-negative: 190 100% 50%;
+    --chart-neutral: 210 10% 35%;
+
+    /* Glass effect */
+    --glass-opacity: 0.8;
+    --blur-amount: 12px;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-background text-foreground transition-colors duration-300;
+    font-family: "Inter", "Manrope", system-ui, sans-serif;
+  }
+
+  :where(p, span, li, h1, h2, h3, h4, h5, h6, a, button, label, td, th) {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  pre,
+  code {
+    overflow-x: auto;
+    white-space: pre;
+    font-family: "Fira Code", monospace;
+  }
+
+  /* Smooth selection */
+  ::selection {
+    @apply bg-primary text-primary-foreground;
+  }
+}
+
+/* Lumina Design System Components */
+@layer components {
+  /* Frosted Glass Panel */
+  .glass-panel {
+    @apply rounded-xl border border-border/30 bg-background/40 backdrop-blur-xl;
+    box-shadow:
+      inset 0 1px 2px rgba(255, 255, 255, 0.1),
+      0 8px 32px rgba(0, 0, 0, 0.08);
+  }
+
+  /* Light mode glass panel */
+  .light .glass-panel {
+    @apply bg-white/50;
+    box-shadow:
+      inset 0 1px 2px rgba(255, 255, 255, 0.5),
+      0 8px 32px rgba(0, 0, 0, 0.06);
+  }
+
+  /* Soft Glow on Hover */
+  .soft-glow {
+    @apply transition-all duration-300;
+  }
+
+  .soft-glow:hover {
+    @apply shadow-lg;
+    box-shadow: 0 0 20px rgba(var(--primary-rgb), 0.1);
+  }
+
+  /* Precision Button with Rounded Style */
+  .btn-lumina {
+    @apply rounded-lg border border-border bg-background text-foreground transition-all duration-300;
+  }
+
+  .btn-lumina:hover {
+    @apply border-primary/50 bg-primary/5;
+  }
+
+  .btn-lumina-primary {
+    @apply rounded-lg bg-primary text-primary-foreground transition-all duration-300;
+  }
+
+  .btn-lumina-primary:hover {
+    @apply shadow-md;
+    box-shadow: 0 4px 12px rgba(var(--primary-rgb), 0.3);
+  }
+
+  /* Smooth Fade & Scale Animation */
+  .fade-in-scale {
+    animation: fadeInScale 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  @keyframes fadeInScale {
+    from {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  /* Subtle Glow Effect */
+  .energy-glow {
+    @apply transition-all duration-300;
+    text-shadow: 0 0 8px rgba(var(--primary-rgb), 0.2);
+  }
+
+  .energy-glow:hover {
+    text-shadow: 0 0 16px rgba(var(--primary-rgb), 0.4);
+  }
+
+  /* Card with Glass effect */
+  .card-lumina {
+    @apply glass-panel rounded-2xl p-6 transition-all duration-300 hover:shadow-lg;
+  }
+
+  /* Input Styling */
+  .input-lumina {
+    @apply rounded-lg border border-border bg-background px-4 py-2 text-foreground transition-all duration-300 placeholder-muted-foreground;
+  }
+
+  .input-lumina:focus {
+    @apply border-primary/50 ring-1 ring-primary/20;
+  }
+}
+
+/* Scrollbar Styling */
+@layer utilities {
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-secondary/30;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-primary/30 transition-colors duration-300;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-primary/50;
+  }
+}

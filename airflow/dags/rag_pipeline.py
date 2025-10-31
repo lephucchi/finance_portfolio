@@ -22,7 +22,7 @@ import os
 default_args = {
     'owner': 'finance_portfolio',
     'depends_on_past': False,
-    'start_date': datetime(2025, 10, 27),
+    'start_date': datetime(2025, 10, 29),
     'email_on_failure': False,
     'email_on_retry': False,
     'retry_delay': timedelta(minutes=5),

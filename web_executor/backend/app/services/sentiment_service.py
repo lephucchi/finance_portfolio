@@ -57,7 +57,8 @@ class SentimentService:
                     positive_pct,
                     negative_pct
                 FROM fizbert.sentiment_features
-                WHERE partition_date BETWEEN '{start_date}' AND '{end_date}'
+                WHERE partition_date >= '{start_date}' 
+                    AND partition_date <= '{end_date}'
                 ORDER BY data_date DESC
             """
 
@@ -113,9 +114,10 @@ class SentimentService:
                     title,
                     source,
                     sentiment_score,
-                    link
+                    content as link
                 FROM fizbert.news
-                WHERE partition_date BETWEEN '{start_date}' AND '{end_date}'
+                WHERE partition_date >= '{start_date}' 
+                    AND partition_date <= '{end_date}'
                     {sentiment_clause}
                 ORDER BY data_date DESC, sentiment_score DESC
                 LIMIT {limit}
@@ -160,7 +162,8 @@ class SentimentService:
                     AVG(avg_sentiment) as avg_sentiment,
                     SUM(article_count) as article_count
                 FROM fizbert.sentiment_features
-                WHERE partition_date BETWEEN '{start_date}' AND '{end_date}'
+                WHERE partition_date >= '{start_date}' 
+                    AND partition_date <= '{end_date}'
                 GROUP BY {date_group}
                 ORDER BY period DESC
             """

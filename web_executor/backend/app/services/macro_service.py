@@ -64,7 +64,8 @@ class MacroService:
                     ma_7,
                     ma_30
                 FROM fizbert.macro_features
-                WHERE partition_date BETWEEN '{start_date}' AND '{end_date}'
+                WHERE partition_date >= '{start_date}' 
+                    AND partition_date <= '{end_date}'
                     {indicator_filter}
                 ORDER BY data_date DESC, indicator_name
             """
@@ -136,7 +137,8 @@ class MacroService:
                     ma_30
                 FROM fizbert.macro_features
                 WHERE indicator_name = '{indicator_name}'
-                    AND partition_date BETWEEN '{start_date}' AND '{end_date}'
+                    AND partition_date >= '{start_date}' 
+                    AND partition_date <= '{end_date}'
                 ORDER BY data_date DESC
             """
 
@@ -170,7 +172,8 @@ class MacroService:
                     indicator_value
                 FROM fizbert.macro_features
                 WHERE indicator_name LIKE '%VND'
-                    AND partition_date BETWEEN '{start_date}' AND '{end_date}'
+                    AND partition_date >= '{start_date}' 
+                    AND partition_date <= '{end_date}'
                 ORDER BY data_date DESC
             """
 

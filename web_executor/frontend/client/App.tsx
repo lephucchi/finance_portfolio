@@ -1,0 +1,43 @@
+import "./global.css";
+
+import { Toaster } from "@/components/ui/toaster";
+import { createRoot } from "react-dom/client";
+import { Toaster as Sonner } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import MainLayout from "./components/layout/MainLayout";
+import Dashboard from "./pages/Dashboard";
+import News from "./pages/News";
+import Screener from "./pages/Screener";
+import Trends from "./pages/Trends";
+import Reports from "./pages/Reports";
+import Chat from "./pages/Chat";
+import NotFound from "./pages/NotFound";
+
+const queryClient = new QueryClient();
+
+const App = () => (
+  <QueryClientProvider client={queryClient}>
+    <TooltipProvider>
+      <Toaster />
+      <Sonner />
+      <BrowserRouter>
+        <MainLayout>
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/news" element={<News />} />
+            <Route path="/screener" element={<Screener />} />
+            <Route path="/trends" element={<Trends />} />
+            <Route path="/reports" element={<Reports />} />
+            <Route path="/chat" element={<Chat />} />
+            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </MainLayout>
+      </BrowserRouter>
+    </TooltipProvider>
+  </QueryClientProvider>
+);
+
+createRoot(document.getElementById("root")!).render(<App />);

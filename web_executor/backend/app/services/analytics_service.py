@@ -103,7 +103,7 @@ class AnalyticsService:
         try:
             sql = f"""
                 SELECT 
-                    m.partition_date as data_date,
+                    m.data_date,
                     m.symbol,
                     m.price_change_pct,
                     s.avg_sentiment,
@@ -113,8 +113,9 @@ class AnalyticsService:
                     ON m.partition_date = s.partition_date
                 LEFT JOIN fizbert.macro_features macro
                     ON m.partition_date = macro.partition_date
-                WHERE m.partition_date BETWEEN '{start_date}' AND '{end_date}'
-                ORDER BY m.partition_date DESC
+                WHERE m.partition_date >= '{start_date}' 
+                    AND m.partition_date <= '{end_date}'
+                ORDER BY m.data_date DESC
             """
 
             logger.info("Fetching correlation analysis data")

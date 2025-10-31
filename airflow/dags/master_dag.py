@@ -22,7 +22,7 @@ import os
 default_args = {
     'owner': 'finance_portfolio',
     'depends_on_past': False,
-    'start_date': datetime(2025, 10, 27),  # Today to allow manual triggers
+    'start_date': datetime(2025, 10, 29),  # Today to allow manual triggers
     'email_on_failure': False,
     'email_on_retry': False,
     'retries': 2,
