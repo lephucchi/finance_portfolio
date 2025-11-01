@@ -340,7 +340,7 @@ export default function Dashboard() {
                         {formatCurrency(asset.close)}
                       </p>
                       <p className="text-sm text-primary font-medium">
-                        {formatPercent(asset.change_pct)}
+                        {formatPercent(asset.price_change_pct)}
                       </p>
                     </div>
                   </div>

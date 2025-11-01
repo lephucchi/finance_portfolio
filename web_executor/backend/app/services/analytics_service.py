@@ -61,22 +61,77 @@ class AnalyticsService:
             macro_stats = self._get_macro_stats(date_)
             logger.info(f"Macro stats: {macro_stats}")
             
-            # Extract values with defaults
+            # Extract market values with defaults
             total_stocks = int(market_stats.get('total_stocks', 0)) if market_stats.get('total_stocks') else 0
             avg_market_change = float(market_stats.get('avg_market_change', 0.0)) if market_stats.get('avg_market_change') else 0.0
+            total_volume = int(market_stats.get('total_volume', 0)) if market_stats.get('total_volume') else 0
+            
+            # Extract sentiment values with defaults
             avg_sentiment = float(sentiment_stats.get('avg_sentiment', 0.0)) if sentiment_stats.get('avg_sentiment') else 0.0
+            positive_pct = float(sentiment_stats.get('positive_pct', 0.0)) if sentiment_stats.get('positive_pct') else 0.0
+            article_count = int(sentiment_stats.get('article_count', 0)) if sentiment_stats.get('article_count') else 0
 
             # Get top gainers and losers
             top_gainers = self._get_top_movers(date_, direction='gainers', limit=5)
             top_losers = self._get_top_movers(date_, direction='losers', limit=5)
+            
+            # Get advancing/declining counts
+            market_breadth = self._get_market_breadth(date_)
+
+            # Extract macro indicators
+            indicators = macro_stats.get('indicators', [])
+            cpi = 0.0
+            usd_vnd = 0.0
+            for ind in indicators:
+                if ind.get('indicator_name') == 'CPI':
+                    cpi = float(ind.get('indicator_value', 0.0))
+                elif ind.get('indicator_name') == 'USD_VND':
+                    usd_vnd = float(ind.get('indicator_value', 0.0))
+
+            # Format top gainers/losers
+            formatted_gainers = [
+                {
+                    "symbol": g.get('symbol', ''),
+                    "price_change_pct": g.get('price_change_pct', 0.0),
+                    "close": g.get('close', 0.0),
+                    "volume": g.get('volume', 0)
+                }
+                for g in top_gainers
+            ]
+            
+            formatted_losers = [
+                {
+                    "symbol": l.get('symbol', ''),
+                    "price_change_pct": l.get('price_change_pct', 0.0),
+                    "close": l.get('close', 0.0),
+                    "volume": l.get('volume', 0)
+                }
+                for l in top_losers
+            ]
 
             summary = {
-                "total_stocks": total_stocks,
-                "market_change_pct": avg_market_change,
-                "avg_sentiment": avg_sentiment,
-                "top_gainers": top_gainers,
-                "top_losers": top_losers,
-                "latest_update": datetime.utcnow() if total_stocks > 0 else None,
+                "date": str(date_),
+                "market": {
+                    "total_stocks": total_stocks,
+                    "market_change_pct": avg_market_change,
+                    "avg_sentiment": avg_sentiment,
+                    "total_volume": total_volume,
+                    "advancing": market_breadth.get('advancing', 0),
+                    "declining": market_breadth.get('declining', 0),
+                    "unchanged": market_breadth.get('unchanged', 0),
+                },
+                "top_gainers": formatted_gainers,
+                "top_losers": formatted_losers,
+                "sentiment": {
+                    "avg_score": avg_sentiment,
+                    "positive_pct": positive_pct,
+                    "total_articles": article_count,
+                },
+                "macro": {
+                    "cpi": cpi,
+                    "usd_vnd": usd_vnd,
+                },
+                "latest_update": datetime.utcnow().isoformat() if total_stocks > 0 else None,
             }
 
             return summary
@@ -233,3 +288,39 @@ class AnalyticsService:
         except Exception as e:
             logger.error(f"Failed to get top {direction}: {str(e)}")
             return []
+
+    def _get_market_breadth(self, date_: date) -> dict[str, Any]:
+        """Get market breadth (advancing, declining, unchanged stocks).
+        
+        Args:
+            date_: Date to query
+            
+        Returns:
+            Dictionary with advancing, declining, and unchanged counts
+        """
+        try:
+            sql = f"""
+                SELECT 
+                    SUM(CASE WHEN price_change_pct > 0 THEN 1 ELSE 0 END) as advancing,
+                    SUM(CASE WHEN price_change_pct < 0 THEN 1 ELSE 0 END) as declining,
+                    SUM(CASE WHEN price_change_pct = 0 THEN 1 ELSE 0 END) as unchanged
+                FROM fizbert.market_dashboard
+                WHERE partition_date = '{date_}'
+                    AND price_change_pct IS NOT NULL
+            """
+
+            results = self.athena.query(sql)
+            
+            if results and len(results) > 0:
+                result = results[0]
+                return {
+                    "advancing": int(result.get('advancing', 0)) if result.get('advancing') else 0,
+                    "declining": int(result.get('declining', 0)) if result.get('declining') else 0,
+                    "unchanged": int(result.get('unchanged', 0)) if result.get('unchanged') else 0,
+                }
+            
+            return {"advancing": 0, "declining": 0, "unchanged": 0}
+
+        except Exception as e:
+            logger.error(f"Failed to get market breadth: {str(e)}")
+            return {"advancing": 0, "declining": 0, "unchanged": 0}

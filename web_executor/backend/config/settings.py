@@ -27,11 +27,12 @@ class Settings(BaseSettings):
     # API CONFIGURATION
     # ========================
     API_V1_STR: str = "/api/v1"
-    ALLOWED_ORIGINS: list[str] = [
-        "http://localhost:3000",
-        "http://localhost:8000",
-        "http://127.0.0.1:3000",
-    ]
+    ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:5173,http://localhost:8000"
+    
+    @property
+    def allowed_origins_list(self) -> list[str]:
+        """Parse ALLOWED_ORIGINS string into list."""
+        return [origin.strip() for origin in self.ALLOWED_ORIGINS.split(",")]
 
     # ========================
     # AWS CONFIGURATION

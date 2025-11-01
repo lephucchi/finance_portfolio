@@ -81,37 +81,45 @@ def process_stock_data(**context):
         spark = get_spark_session("Silver-StockProcessing")
         bucket_name = os.getenv('S3_BUCKET', 'bankanalystportfolio')
         
-        # Read JSON files directly from S3 with PySpark
-        bronze_path = f"s3a://{bucket_name}/bronze/stocks/raw/*.json"
-        logger.info(f"📂 Reading from: {bronze_path}")
+        # ⚡ OPTIMIZATION: List only today's files using boto3 before Spark read
+        from airflow.providers.amazon.aws.hooks.s3 import S3Hook
+        import boto3
         
-        # Read JSON with multiLine option
-        df_raw = spark.read.option("multiLine", "true").json(bronze_path)
+        logger.info(f"� Finding today's stock files in Bronze ({date_str})...")
         
-        # Check if data exists
-        if df_raw.count() == 0:
+        s3_hook = S3Hook(aws_conn_id='aws_default')
+        s3_client = s3_hook.get_conn()
+        
+        # List only files modified today
+        prefix = "bronze/stocks/raw/"
+        today_files = []
+        paginator = s3_client.get_paginator('list_objects_v2')
+        
+        for page in paginator.paginate(Bucket=bucket_name, Prefix=prefix):
+            if 'Contents' not in page:
+                continue
+            for obj in page['Contents']:
+                # Check if file was modified today
+                if obj['LastModified'].strftime('%Y-%m-%d') == date_str:
+                    today_files.append(f"s3a://{bucket_name}/{obj['Key']}")
+        
+        if len(today_files) == 0:
             logger.warning(f"⚠️ No stock files found for {date_str}")
             return {'stocks_processed': 0, 'execution_date': date_str}
         
-        logger.info(f"📊 Loaded {df_raw.count()} stock files")
+        logger.info(f"📊 Found {len(today_files)} stock files for {date_str}")
+        logger.info(f"📂 Reading only today's files with PySpark...")
         
-        # Explode nested data array
-        from pyspark.sql.functions import explode
-        df_exploded = df_raw.withColumn("stock_record", explode("data")) \
-            .select(
-                col("ticker"),
-                col("_source"),
-                col("_ingested_at_utc"),
-                col("stock_record.*")
-            )
+        # Read ONLY today's files
+        df_today = spark.read.option("multiLine", "true").json(today_files)
         
-        # Clean and standardize with PySpark
+        # Data is already flat (no nested array), just clean columns
         logger.info(f"🧹 Cleaning and standardizing data with PySpark...")
         
-        df_cleaned = df_exploded \
+        df_cleaned = df_today \
             .withColumnRenamed("ticker", "symbol") \
             .withColumn("symbol", upper(col("symbol"))) \
-            .withColumn("data_date", to_date(col("time"))) \
+            .withColumn("data_date", to_date(col("date"))) \
             .withColumn("open", col("open").cast(DoubleType())) \
             .withColumn("high", col("high").cast(DoubleType())) \
             .withColumn("low", col("low").cast(DoubleType())) \
@@ -241,31 +249,50 @@ def process_news_data(**context):
         spark = get_spark_session("Silver-NewsProcessing")
         bucket_name = os.getenv('S3_BUCKET', 'bankanalystportfolio')
         
-        # Read JSON files directly from S3
-        bronze_path = f"s3a://{bucket_name}/bronze/news/raw/*.json"
-        logger.info(f"📂 Reading from: {bronze_path}")
+        # ⚡ OPTIMIZATION: Use boto3 to filter files by date BEFORE reading with Spark
+        # This avoids reading 8640+ files when we only need today's ~10-50 files
+        from airflow.providers.amazon.aws.hooks.s3 import S3Hook
+        import boto3
         
-        df_raw = spark.read.option("multiLine", "true").json(bronze_path)
+        logger.info(f"� Finding today's news files in Bronze ({date_str})...")
         
-        if df_raw.count() == 0:
-            logger.warning(f"⚠️ No news files found")
+        s3_hook = S3Hook(aws_conn_id='aws_default')
+        s3_client = s3_hook.get_conn()
+        
+        # List only files modified today
+        prefix = "bronze/news/raw/"
+        today_files = []
+        paginator = s3_client.get_paginator('list_objects_v2')
+        
+        for page in paginator.paginate(Bucket=bucket_name, Prefix=prefix):
+            if 'Contents' not in page:
+                continue
+            for obj in page['Contents']:
+                # Check if file was modified today (LastModified in UTC)
+                if obj['LastModified'].strftime('%Y-%m-%d') == date_str:
+                    today_files.append(f"s3a://{bucket_name}/{obj['Key']}")
+        
+        if len(today_files) == 0:
+            logger.warning(f"⚠️ No news files found for {date_str}")
             return {'news_processed': 0, 'execution_date': date_str}
         
-        logger.info(f"📊 Loaded {df_raw.count()} news files")
+        logger.info(f"📊 Found {len(today_files)} news files for {date_str} (vs 8640 total)")
+        logger.info(f"📂 Reading only today's files with PySpark...")
+        
+        # Read ONLY today's files
+        df_today = spark.read.option("multiLine", "true").json(today_files)
         
         # Clean and standardize
         from pyspark.sql.functions import when, length, coalesce
         
-        # Handle date parsing - use coalesce to try different date columns
-        df_cleaned = df_raw \
+        # Handle date parsing - use published_date only
+        df_cleaned = df_today \
             .withColumn("data_date", 
-                       coalesce(to_date(col("published_date")), 
-                               to_date(col("date")),
-                               lit(date_str))) \
+                       coalesce(to_date(col("published_date")), lit(date_str))) \
             .withColumn("title", 
-                       coalesce(col("title"), col("snippet"), lit(""))) \
+                       coalesce(col("title"), lit(""))) \
             .withColumn("content", 
-                       coalesce(col("combined_text"), col("snippet"), lit(""))) \
+                       coalesce(col("title"), lit(""))) \
             .filter(length(col("content")) > 0)
         
         # Drop duplicates by id if exists

@@ -39,10 +39,12 @@ from pyspark.sql.types import DoubleType
 import json
 import logging
 import os
+import pandas as pd
+from io import BytesIO
 
 # Configuration
 S3_BUCKET = 'bankanalystportfolio'
-S3_CONN_ID = 'aws_s3_conn'
+S3_CONN_ID = 'aws_default'  # Fixed: use aws_default not aws_s3_conn
 
 # Default arguments
 default_args = {
@@ -72,12 +74,13 @@ def get_spark_session(app_name="GoldLayer"):
     """Create or get existing Spark session with S3 support"""
     return SparkSession.builder \
         .appName(app_name) \
-        .config("spark.executor.memory", "4g") \
-        .config("spark.driver.memory", "2g") \
-        .config("spark.sql.shuffle.partitions", "200") \
+        .master("local[2]") \
+        .config("spark.executor.memory", "1g") \
+        .config("spark.driver.memory", "1g") \
+        .config("spark.sql.shuffle.partitions", "50") \
+        .config("spark.driver.maxResultSize", "512m") \
         .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem") \
         .config("spark.hadoop.fs.s3a.aws.credentials.provider", "com.amazonaws.auth.DefaultAWSCredentialsProviderChain") \
-        .config("spark.jars.packages", "org.apache.hadoop:hadoop-aws:3.3.4") \
         .getOrCreate()
 
 
@@ -100,23 +103,39 @@ def create_market_features(**context):
         spark = get_spark_session("Gold-MarketFeatures")
         bucket_name = os.getenv('S3_BUCKET', S3_BUCKET)
         
-        # Read Silver stocks data
-        silver_path = f"s3a://{bucket_name}/silver/stocks"
+        # Read Silver stocks data - read specific partition to avoid empty reads
+        # For now, only read today's partition since Silver only has today's data
+        partition_date_str = end_date.strftime('%Y-%m-%d')
+        silver_path = f"s3a://{bucket_name}/silver/stocks/partition_date={partition_date_str}"
         logging.info(f"📂 Reading from: {silver_path}")
         
-        df_stocks = spark.read.parquet(silver_path)
+        try:
+            df_stocks = spark.read \
+                .option("pathGlobFilter", "*.parquet") \
+                .parquet(silver_path)
+        except Exception as read_error:
+            logging.error(f"Failed to read partition {partition_date_str}: {read_error}")
+            # Try reading all partitions as fallback
+            silver_path_all = f"s3a://{bucket_name}/silver/stocks"
+            logging.info(f"📂 Fallback: Reading from {silver_path_all}")
+            df_stocks = spark.read \
+                .option("pathGlobFilter", "*.parquet") \
+                .parquet(silver_path_all)
         
-        # Filter date range
+        # Filter date range for MA calculation (need historical data)
         df_filtered = df_stocks.filter(
             (col("data_date") >= lit(start_date.strftime('%Y-%m-%d'))) &
             (col("data_date") <= lit(end_date.strftime('%Y-%m-%d')))
         )
         
-        if df_filtered.count() == 0:
+        row_count = df_filtered.count()
+        if row_count == 0:
             logging.warning("No stock data in date range")
             return
         
-        logging.info(f"Processing stocks from {start_date} to {end_date}")
+        logging.info(f"Processing {row_count} rows from {start_date} to {end_date}")
+        logging.warning(f"⚠️ Note: Technical indicators require 30 days of historical data. "
+                       f"If only 1 day available, indicators will be NULL")
         
         # Define window for technical indicators
         window_spec = Window.partitionBy("symbol").orderBy("data_date")
@@ -149,7 +168,14 @@ def create_market_features(**context):
         
         # Add partition date
         partition_date_str = end_date.strftime('%Y-%m-%d')
-        df_final = df_market_features.withColumn("partition_date", lit(partition_date_str))
+        df_with_partition = df_market_features.withColumn("partition_date", lit(partition_date_str))
+        
+        # Select output columns explicitly
+        output_cols = ['symbol', 'data_date', 'open', 'high', 'low', 'close', 'volume',
+                       'price_change', 'price_change_pct', 
+                       'MA_5', 'MA_10', 'MA_20', 'MA_30', 'RSI_14', 'volatility_7d',
+                       '_source', '_ingested_at_utc', 'partition_date']
+        df_final = df_with_partition.select(*[c for c in output_cols if c in df_with_partition.columns])
         
         total_records = df_final.count()
         unique_symbols = df_final.select("symbol").distinct().count()
@@ -235,10 +261,11 @@ def create_market_features(**context):
         stocks_df = pd.concat(all_stocks, ignore_index=True)
         
         # Calculate technical indicators by symbol
+        # NOTE: This function is deprecated - using PySpark version in create_market_features() instead
         results = []
         for symbol in stocks_df['symbol'].unique():
             symbol_df = stocks_df[stocks_df['symbol'] == symbol].copy()
-            symbol_df = calculate_technical_indicators(symbol_df)
+            # symbol_df = calculate_technical_indicators(symbol_df)  # DEPRECATED
             results.append(symbol_df)
         
         market_features_df = pd.concat(results, ignore_index=True)
@@ -306,7 +333,9 @@ def create_sector_performance(**context):
         market_path = f"s3a://{bucket_name}/gold/analytics/market_features/partition_date={partition_date_str}"
         logging.info(f"📂 Reading from: {market_path}")
         
-        df_market = spark.read.parquet(market_path)
+        df_market = spark.read \
+            .option("pathGlobFilter", "*.parquet") \
+            .parquet(market_path)
         
         if df_market.count() == 0:
             logging.warning("No market features found")
@@ -321,12 +350,23 @@ def create_sector_performance(**context):
                        .when(col("symbol").isin(['VIC', 'VHM']), "Real Estate")
                        .otherwise("Others"))
         
-        # Calculate sector aggregations
-        df_sector_agg = df_with_sector.groupBy("sector").agg(
+        # Calculate sector aggregations (handle NULL volatility_7d gracefully)
+        agg_exprs = [
             avg("price_change_pct").alias("avg_price_change_pct"),
-            avg("volatility_7d").alias("avg_volatility"),
             avg("volume").alias("avg_volume")
-        )
+        ]
+        
+        # Add volatility if column exists
+        if "volatility_7d" in df_with_sector.columns:
+            agg_exprs.append(avg("volatility_7d").alias("avg_volatility"))
+        else:
+            logging.warning("⚠️ volatility_7d column not found, using NULL")
+        
+        df_sector_agg = df_with_sector.groupBy("sector").agg(*agg_exprs)
+        
+        # Add NULL volatility column if it doesn't exist
+        if "avg_volatility" not in df_sector_agg.columns:
+            df_sector_agg = df_sector_agg.withColumn("avg_volatility", lit(None).cast(DoubleType()))
         
         # Add date and partition
         df_final = df_sector_agg \
@@ -592,8 +632,15 @@ def create_serving_cache(**context):
             obj = s3_hook.get_key(market_parquet[0], bucket_name=S3_BUCKET)
             market_df = pd.read_parquet(BytesIO(obj.get()['Body'].read()))
             
-            # Create market dashboard cache (subset of columns for fast loading)
-            dashboard_df = market_df[['symbol', 'data_date', 'open', 'close', 'volume', 'MA_20', 'RSI_14', 'volatility_7d', 'price_change_pct']].copy()
+            # Create market dashboard cache - select available columns only
+            base_cols = ['symbol', 'data_date', 'open', 'close', 'volume', 'price_change_pct']
+            indicator_cols = ['MA_20', 'RSI_14', 'volatility_7d']
+            
+            # Add indicators if they exist
+            available_cols = base_cols + [c for c in indicator_cols if c in market_df.columns]
+            dashboard_df = market_df[available_cols].copy()
+            
+            logging.info(f"Dashboard columns: {available_cols}")
             
             # Write market dashboard
             serving_prefix = f'gold/serving/market_dashboard/partition_date={partition_date_str}/'
@@ -632,8 +679,8 @@ def create_serving_cache(**context):
             s3_hook.load_bytes(parquet_buffer.read(), key=s3_key, bucket_name=S3_BUCKET, replace=True)
             logging.info("Sentiment features cache created")
         
-        # 3. Risk Metrics Cache (from market features)
-        if market_parquet:
+        # 3. Risk Metrics Cache (from market features) - handle missing volatility
+        if market_parquet and 'volatility_7d' in market_df.columns:
             risk_df = market_df[['data_date', 'symbol', 'volatility_7d']].copy()
             
             # Write risk metrics
@@ -646,6 +693,8 @@ def create_serving_cache(**context):
             s3_key = f'{serving_prefix}risk_metrics_{end_date.strftime("%Y%m%d")}.parquet'
             s3_hook.load_bytes(parquet_buffer.read(), key=s3_key, bucket_name=S3_BUCKET, replace=True)
             logging.info("Risk metrics cache created")
+        elif market_parquet:
+            logging.warning("⚠️ Skipping risk metrics - volatility_7d not available")
         
         logging.info("✅ Operation completed successfully")
         logging.info("Serving cache creation completed")
