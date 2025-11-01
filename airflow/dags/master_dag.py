@@ -35,7 +35,7 @@ dag = DAG(
     'master_pipeline',
     default_args=default_args,
     description='Master orchestrator for Finance Portfolio ETL Pipeline (Bronze→Silver→Gold→RAG)',
-    schedule_interval='0 6 * * 1-5',  # 6:00 AM weekdays
+    schedule_interval='0 16 * * 1-5',  # 6:00 AM weekdays
     catchup=False,
     max_active_runs=1,
     max_active_tasks=16,

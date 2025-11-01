@@ -27,7 +27,7 @@ x-airflow-common:
     PYTHONPATH: '/opt/airflow/finance_portfolio'
     # Spark configurations
     SPARK_HOME: '/opt/spark'
-    JAVA_HOME: '/usr/lib/jvm/java-11-openjdk-amd64'
+    JAVA_HOME: '/usr/lib/jvm/java-17-openjdk-amd64'
     PYSPARK_PYTHON: 'python3'
     PYSPARK_DRIVER_PYTHON: 'python3'
     # Production optimizations (Phase 1)

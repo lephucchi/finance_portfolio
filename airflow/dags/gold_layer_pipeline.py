@@ -1,7 +1,7 @@
-# Gold Layer Pipeline - 4-Layer Analytics Architecture
+# Gold Layer Pipeline - 4-Layer Analytics Architecture (PySpark Version)
 # =====================================================
 # Creates analytics-ready datasets with technical indicators, sentiment analysis,
-# serving cache, and pipeline metadata tracking.
+# serving cache, and pipeline metadata tracking using PySpark for scalability.
 #
 # 4-Layer Architecture (aligned with S3_LAKEHOUSE_COMPLETE_STRUCTURE.md):
 # 1. analytics/ - Business intelligence tables (Athena queryable)
@@ -22,22 +22,23 @@
 #
 # Author: finance_portfolio
 # Schedule: Daily at 8 AM (weekdays), after Silver layer
-# Dependencies: pandas, pyarrow, numpy
+# Dependencies: pyspark, pyarrow
 # =====================================================
 
 from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.providers.amazon.aws.hooks.s3 import S3Hook
-import pandas as pd
-import numpy as np
-from io import BytesIO
+from pyspark.sql import SparkSession
+from pyspark.sql.window import Window
+from pyspark.sql.functions import (
+    col, lit, avg, sum as spark_sum, count, max as spark_max, min as spark_min,
+    lag, stddev, round as spark_round, when, coalesce, row_number, desc
+)
+from pyspark.sql.types import DoubleType
 import json
 import logging
-import sys
-
-# sys.path.append('/opt/airflow/dags')
-# Removed enhanced_logger import for simplified testing
+import os
 
 # Configuration
 S3_BUCKET = 'bankanalystportfolio'
@@ -47,7 +48,7 @@ S3_CONN_ID = 'aws_s3_conn'
 default_args = {
     'owner': 'finance_portfolio',
     'depends_on_past': False,
-    'start_date': datetime(2025, 10, 29),  # Current date to avoid future execution date issues
+    'start_date': datetime(2025, 10, 29),
     'email_on_failure': False,
     'email_on_retry': False,
     'retries': 2,
@@ -59,45 +60,138 @@ default_args = {
 dag = DAG(
     'gold_layer_pipeline',
     default_args=default_args,
-    description='Gold layer - 4-layer analytics architecture',
+    description='Gold layer - 4-layer analytics architecture (PySpark)',
     schedule_interval=None,  # Triggered by master_pipeline only
     catchup=False,
-    tags=['gold', 'lakehouse', 'analytics'],
+    tags=['gold', 'lakehouse', 'analytics', 'pyspark'],
     max_active_runs=1
 )
 
-def calculate_technical_indicators(df: pd.DataFrame) -> pd.DataFrame:
-    """Calculate technical indicators for stock data"""
-    df = df.sort_values('data_date')
-    
-    # Moving Averages
-    df['MA_5'] = df['close'].rolling(window=5).mean()
-    df['MA_10'] = df['close'].rolling(window=10).mean()
-    df['MA_20'] = df['close'].rolling(window=20).mean()
-    df['MA_30'] = df['close'].rolling(window=30).mean()
-    
-    # RSI (14-day)
-    delta = df['close'].diff()
-    gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
-    loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
-    rs = gain / loss
-    df['RSI_14'] = 100 - (100 / (1 + rs))
-    
-    # Volatility (7-day)
-    df['volatility_7d'] = df['close'].rolling(window=7).std()
-    
-    return df
+
+def get_spark_session(app_name="GoldLayer"):
+    """Create or get existing Spark session with S3 support"""
+    return SparkSession.builder \
+        .appName(app_name) \
+        .config("spark.executor.memory", "4g") \
+        .config("spark.driver.memory", "2g") \
+        .config("spark.sql.shuffle.partitions", "200") \
+        .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem") \
+        .config("spark.hadoop.fs.s3a.aws.credentials.provider", "com.amazonaws.auth.DefaultAWSCredentialsProviderChain") \
+        .config("spark.jars.packages", "org.apache.hadoop:hadoop-aws:3.3.4") \
+        .getOrCreate()
+
 
 def create_market_features(**context):
     """
-    Layer 1 - ANALYTICS: Create market_features table with technical indicators
+    Layer 1 - ANALYTICS: Create market_features table with technical indicators using PySpark
     Input: silver/stocks/partition_date=*/stock_data.parquet
     Output: gold/analytics/market_features/partition_date=YYYY-MM-DD/*.parquet
     """
-    execution_date = context['execution_date']
-    # Simple logging instead of enhanced logger calls
-    logging.info(f"🚀 Starting gold_layer create_market_features operation")
-    
+    spark = None
+    try:
+        execution_date = context['execution_date']
+        end_date = execution_date.date()
+        start_date = end_date - timedelta(days=30)  # 30 days for MA calculation
+        
+        logger = logging.getLogger(__name__)
+        logging.info(f"🚀 Starting PySpark market_features for {end_date}")
+        
+        # Initialize Spark
+        spark = get_spark_session("Gold-MarketFeatures")
+        bucket_name = os.getenv('S3_BUCKET', S3_BUCKET)
+        
+        # Read Silver stocks data
+        silver_path = f"s3a://{bucket_name}/silver/stocks"
+        logging.info(f"📂 Reading from: {silver_path}")
+        
+        df_stocks = spark.read.parquet(silver_path)
+        
+        # Filter date range
+        df_filtered = df_stocks.filter(
+            (col("data_date") >= lit(start_date.strftime('%Y-%m-%d'))) &
+            (col("data_date") <= lit(end_date.strftime('%Y-%m-%d')))
+        )
+        
+        if df_filtered.count() == 0:
+            logging.warning("No stock data in date range")
+            return
+        
+        logging.info(f"Processing stocks from {start_date} to {end_date}")
+        
+        # Define window for technical indicators
+        window_spec = Window.partitionBy("symbol").orderBy("data_date")
+        
+        # Calculate Moving Averages using window functions
+        df_with_ma = df_filtered \
+            .withColumn("MA_5", avg("close").over(window_spec.rowsBetween(-4, 0))) \
+            .withColumn("MA_10", avg("close").over(window_spec.rowsBetween(-9, 0))) \
+            .withColumn("MA_20", avg("close").over(window_spec.rowsBetween(-19, 0))) \
+            .withColumn("MA_30", avg("close").over(window_spec.rowsBetween(-29, 0)))
+        
+        # Calculate RSI (14-day)
+        df_with_price_change = df_with_ma \
+            .withColumn("price_delta", col("close") - lag("close", 1).over(window_spec))
+        
+        df_with_gain_loss = df_with_price_change \
+            .withColumn("gain", when(col("price_delta") > 0, col("price_delta")).otherwise(0)) \
+            .withColumn("loss", when(col("price_delta") < 0, -col("price_delta")).otherwise(0))
+        
+        df_with_rsi = df_with_gain_loss \
+            .withColumn("avg_gain", avg("gain").over(window_spec.rowsBetween(-13, 0))) \
+            .withColumn("avg_loss", avg("loss").over(window_spec.rowsBetween(-13, 0))) \
+            .withColumn("rs", col("avg_gain") / col("avg_loss")) \
+            .withColumn("RSI_14", 100 - (100 / (1 + col("rs")))) \
+            .drop("price_delta", "gain", "loss", "avg_gain", "avg_loss", "rs")
+        
+        # Calculate Volatility (7-day)
+        df_market_features = df_with_rsi \
+            .withColumn("volatility_7d", stddev("close").over(window_spec.rowsBetween(-6, 0)))
+        
+        # Add partition date
+        partition_date_str = end_date.strftime('%Y-%m-%d')
+        df_final = df_market_features.withColumn("partition_date", lit(partition_date_str))
+        
+        total_records = df_final.count()
+        unique_symbols = df_final.select("symbol").distinct().count()
+        
+        logging.info(f"✅ Calculated indicators: {total_records} records, {unique_symbols} symbols")
+        
+        # Write to Gold analytics layer with partitioning
+        output_path = f"s3a://{bucket_name}/gold/analytics/market_features"
+        logging.info(f"💾 Writing to: {output_path}")
+        
+        df_final.write \
+            .mode("overwrite") \
+            .partitionBy("partition_date") \
+            .parquet(output_path, compression="snappy")
+        
+        # Save metadata
+        s3_hook = S3Hook(aws_conn_id='aws_default')
+        metadata = {
+            'execution_date': execution_date.isoformat(),
+            'date_range': {'start': start_date.isoformat(), 'end': end_date.isoformat()},
+            'records_processed': total_records,
+            'symbols_count': unique_symbols,
+            'processing_engine': 'pyspark',
+            'features': ['MA_5', 'MA_10', 'MA_20', 'MA_30', 'RSI_14', 'volatility_7d']
+        }
+        
+        metadata_key = f'gold/analytics/market_features/partition_date={partition_date_str}/_metadata.json'
+        s3_hook.load_string(
+            json.dumps(metadata, indent=2),
+            key=metadata_key,
+            bucket_name=bucket_name,
+            replace=True
+        )
+        
+        logging.info(f"✅ Market features completed: {total_records} records, {unique_symbols} symbols")
+        
+    except Exception as e:
+        logging.error(f"❌ Error in create_market_features: {str(e)}")
+        raise
+    finally:
+        if spark:
+            spark.stop()
     try:
         s3_hook = S3Hook(aws_conn_id=S3_CONN_ID)
         end_date = execution_date.date()
@@ -192,66 +286,73 @@ def create_market_features(**context):
 
 def create_sector_performance(**context):
     """
-    Layer 1 - ANALYTICS: Create sector_performance table
+    Layer 1 - ANALYTICS: Create sector_performance table using PySpark
     Input: gold/analytics/market_features/partition_date=*/
     Output: gold/analytics/sector_performance/partition_date=YYYY-MM-DD/*.parquet
     """
-    execution_date = context['execution_date']
-    logging.info("🚀 Starting operation")
-    
+    spark = None
     try:
-        s3_hook = S3Hook(aws_conn_id=S3_CONN_ID)
+        execution_date = context['execution_date']
         end_date = execution_date.date()
         partition_date_str = end_date.strftime('%Y-%m-%d')
         
-        # Read market features
-        market_prefix = f'gold/analytics/market_features/partition_date={partition_date_str}/'
-        market_files = s3_hook.list_keys(bucket_name=S3_BUCKET, prefix=market_prefix)
-        market_parquet = [f for f in market_files if f.endswith('.parquet')]
+        logging.info(f"🚀 Starting PySpark sector_performance for {partition_date_str}")
         
-        if not market_parquet:
+        # Initialize Spark
+        spark = get_spark_session("Gold-SectorPerformance")
+        bucket_name = os.getenv('S3_BUCKET', S3_BUCKET)
+        
+        # Read market features
+        market_path = f"s3a://{bucket_name}/gold/analytics/market_features/partition_date={partition_date_str}"
+        logging.info(f"📂 Reading from: {market_path}")
+        
+        df_market = spark.read.parquet(market_path)
+        
+        if df_market.count() == 0:
             logging.warning("No market features found")
             return
         
-        obj = s3_hook.get_key(market_parquet[0], bucket_name=S3_BUCKET)
-        market_df = pd.read_parquet(BytesIO(obj.get()['Body'].read()))
-        
-        # Define sector mapping (simplified)
-        sector_mapping = {
-            'VCB': 'Banking', 'BID': 'Banking', 'CTG': 'Banking', 'ACB': 'Banking',
-            'VNM': 'Consumer', 'MSN': 'Consumer', 'MWG': 'Consumer',
-            'HPG': 'Materials', 'HSG': 'Materials',
-            'VIC': 'Real Estate', 'VHM': 'Real Estate'
-        }
-        
-        market_df['sector'] = market_df['symbol'].map(sector_mapping).fillna('Others')
+        # Define sector mapping using PySpark when/otherwise
+        df_with_sector = df_market \
+            .withColumn("sector", 
+                       when(col("symbol").isin(['VCB', 'BID', 'CTG', 'ACB']), "Banking")
+                       .when(col("symbol").isin(['VNM', 'MSN', 'MWG']), "Consumer")
+                       .when(col("symbol").isin(['HPG', 'HSG']), "Materials")
+                       .when(col("symbol").isin(['VIC', 'VHM']), "Real Estate")
+                       .otherwise("Others"))
         
         # Calculate sector aggregations
-        sector_agg = market_df.groupby('sector').agg({
-            'price_change_pct': 'mean',
-            'volatility_7d': 'mean',
-            'volume': 'mean'
-        }).reset_index()
+        df_sector_agg = df_with_sector.groupBy("sector").agg(
+            avg("price_change_pct").alias("avg_price_change_pct"),
+            avg("volatility_7d").alias("avg_volatility"),
+            avg("volume").alias("avg_volume")
+        )
         
-        sector_agg.columns = ['sector', 'avg_price_change_pct', 'avg_volatility', 'avg_volume']
-        sector_agg['data_date'] = end_date
+        # Add date and partition
+        df_final = df_sector_agg \
+            .withColumn("data_date", lit(partition_date_str)) \
+            .withColumn("partition_date", lit(partition_date_str))
+        
+        total_sectors = df_final.count()
+        logging.info(f"✅ Created sector performance: {total_sectors} sectors")
         
         # Write to Gold analytics layer
-        gold_prefix = f'gold/analytics/sector_performance/partition_date={partition_date_str}/'
+        output_path = f"s3a://{bucket_name}/gold/analytics/sector_performance"
+        logging.info(f"💾 Writing to: {output_path}")
         
-        parquet_buffer = BytesIO()
-        sector_agg.to_parquet(parquet_buffer, engine='pyarrow', compression='snappy', index=False)
-        parquet_buffer.seek(0)
+        df_final.write \
+            .mode("overwrite") \
+            .partitionBy("partition_date") \
+            .parquet(output_path, compression="snappy")
         
-        s3_key = f'{gold_prefix}sector_performance_{end_date.strftime("%Y%m%d")}.parquet'
-        s3_hook.load_bytes(parquet_buffer.read(), key=s3_key, bucket_name=S3_BUCKET, replace=True)
-        
-        logging.info("✅ Operation completed successfully")
-        logging.info(f"Sector performance created: {len(sector_agg)} sectors")
+        logging.info(f"✅ Sector performance completed: {total_sectors} sectors")
         
     except Exception as e:
-        logging.error("❌ Operation failed")
+        logging.error(f"❌ Error in create_sector_performance: {str(e)}")
         raise
+    finally:
+        if spark:
+            spark.stop()
 
 def create_news_summary(**context):
     """
