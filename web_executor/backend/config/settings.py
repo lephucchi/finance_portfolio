@@ -97,6 +97,26 @@ class Settings(BaseSettings):
     DEFAULT_PAGE_SIZE: int = 20
     MAX_PAGE_SIZE: int = 100
 
+    # ========================
+    # RAG CONFIGURATION
+    # ========================
+    RAG_ENABLED: bool = True
+    RAG_MODEL_NAME: str = "intfloat/multilingual-e5-large"  # 1024-dim, matches FAISS index
+    RAG_FAISS_INDEX_PATH: str = "data/rag/faiss_index.bin"
+    RAG_METADATA_PATH: str = "data/rag/metadata.json"
+    RAG_EMBEDDINGS_PATH: str = "data/rag/embeddings.npy"
+    RAG_TOP_K: int = 5
+    RAG_TEMPERATURE: float = 0.7
+    RAG_MAX_TOKENS: int = 2048
+    
+    # MCP Configuration
+    MCP_ENABLED: bool = True
+    MCP_SERVER_PORT: int = 8001
+    
+    # User API Key Management
+    ALLOW_USER_API_KEYS: bool = True  # Allow users to provide their own Gemini API keys
+    DEFAULT_GEMINI_API_KEY: Optional[str] = None  # Optional default key for demo
+
     class Config:
         """Pydantic configuration."""
 

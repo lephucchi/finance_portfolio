@@ -28,6 +28,16 @@ async def lifespan(app: FastAPI):
     logger.info(f"Environment: {settings.ENVIRONMENT}")
     logger.info(f"Debug: {settings.DEBUG}")
     
+    # Initialize RAG service at startup if enabled
+    if settings.RAG_ENABLED:
+        logger.info("Initializing RAG service at startup...")
+        try:
+            from app.api.v1.endpoints.rag import init_rag_service
+            init_rag_service()
+            logger.info("RAG service initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize RAG service: {e}", exc_info=True)
+    
     yield
     
     # Shutdown
@@ -99,7 +109,7 @@ def create_app() -> FastAPI:
     @app.exception_handler(ValueError)
     async def value_error_handler(request, exc):
         """Handle ValueError exceptions."""
-        logger.error(f"ValueError: {str(exc)}")
+        logger.error(f"ValueError on {request.method} {request.url.path}: {str(exc)}", exc_info=True)
         return JSONResponse(
             status_code=400,
             content={

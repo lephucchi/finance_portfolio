@@ -7,3 +7,15 @@ boto3==1.28.0
 supabase==2.3.4
 sqlalchemy==2.0.23
 python-multipart==0.0.6
+
+# RAG Dependencies
+faiss-cpu==1.7.4
+sentence-transformers>=3.0.0  # Supports both vietnamese-sbert & e5-large
+google-generativeai==0.3.2
+numpy>=1.24.0,<2.0.0
+transformers>=4.40.0
+huggingface-hub>=0.23.0
+torch>=2.6.0
+
+# MCP Support
+mcp>=1.0.0

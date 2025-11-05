@@ -8,6 +8,26 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
     port: parseInt(process.env.VITE_PORT || "5173"),
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+        secure: false,
+        timeout: 30000, // 30 seconds timeout
+        proxyTimeout: 30000,
+        configure: (proxy, options) => {
+          proxy.on('error', (err, req, res) => {
+            console.error('Proxy error:', err);
+          });
+          proxy.on('proxyReq', (proxyReq, req, res) => {
+            console.log('Proxying:', req.method, req.url);
+          });
+          proxy.on('proxyRes', (proxyRes, req, res) => {
+            console.log('Proxy response:', proxyRes.statusCode, req.url);
+          });
+        },
+      },
+    },
     fs: {
       allow: [".", "./client", "./shared"],
       deny: [".env", ".env.*", "*.{crt,pem}", "**/.git/**", "server/**"],
@@ -16,7 +36,7 @@ export default defineConfig(({ mode }) => ({
   build: {
     outDir: "dist/spa",
   },
-  plugins: [react(), expressPlugin()],
+  plugins: [react()], // Temporarily disabled expressPlugin() to test proxy
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./client"),
