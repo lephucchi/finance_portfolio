@@ -1,8 +1,20 @@
-# Finance Portfolio Research - End-to-End System
+# 🏦 Finance Analytics Platform - End-to-End System
 
-## Overview
-This project builds a financial portfolio research platform using Databricks, FastAPI/NestJS, and Next.js.  
-It integrates stock OHLCV data, financial reports, and news sentiment analysis to provide investors with insights via a web dashboard.
+**Author**: metallica aka lephucchi  
+**Date**: November 5, 2025  
+**Status**: ✅ Production Ready (v1.0)  
+**License**: MIT
+
+## 🎯 Overview
+
+A comprehensive **financial analytics platform** powered by **Lakehouse Architecture (AWS S3 + Glue + Athena)**, **Apache Airflow ETL**, and **RAG Chatbot with AI**.
+
+This system provides Vietnamese investors with real-time insights into:
+- 📈 **Stock Market Analysis** (30 symbols × 365 days = 10,950 records)
+- 📰 **Financial News Intelligence** (12,027 articles with sentiment analysis)
+- 📊 **Macroeconomic Indicators** (50+ indicators from VN economic data)
+- 🤖 **AI-Powered Chatbot** (Natural language queries with FAISS vector search + Gemini API)
+- ⚡ **Fast Analytics Queries** (0.5-1s response time, 97% cost savings)
 
 ---
 
