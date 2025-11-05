@@ -32,6 +32,9 @@ RUN curl -L "https://archive.apache.org/dist/spark/spark-${SPARK_VERSION}/spark-
 # Switch back to airflow user
 USER airflow
 
+# Copy .env file if it exists
+COPY --chown=airflow:root .env* ./
+
 # Copy requirements if needed
 COPY requirements.txt /requirements.txt
 RUN pip install --no-cache-dir -r /requirements.txt || true

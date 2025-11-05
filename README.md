@@ -658,50 +658,253 @@ Cache Hit Rate:     95% (5-min TTL)
 
 ## 🚀 Deployment
 
+### Quick Deploy (Single Command)
+
+```bash
+# Using PowerShell (Windows)
+.\deploy.ps1
+
+# Using Bash (Linux/macOS)
+bash deploy.sh
+
+# Select deployment option:
+# 1) Full Stack (Airflow + Backend + Frontend)
+# 2) Only Airflow
+# 3) Only Web Executor (Backend + Frontend)
+# 4) Only Backend
+# 5) Only Frontend
+```
+
 ### Development (Docker Compose)
 
 ```bash
+# Start all services
 docker-compose up -d
 
-# Verify
+# Verify services
 docker-compose ps
 
-# Logs
-docker-compose logs -f backend
+# View logs
+docker-compose logs -f
+
+# Stop all services
+docker-compose down
 ```
 
-### Production (AWS)
+### Production Deployment on AWS EC2
+
+#### Step 1: Prepare EC2 Instance
 
 ```bash
-# Build Docker images
-docker build -t finance-backend web_executor/backend/
-docker build -t finance-frontend web_executor/frontend/
+# Launch Ubuntu 22.04 LTS on EC2
+# Instance type: t2.large (recommended) or t2.medium (minimum)
+# Storage: 30GB GP3 SSD
 
-# Push to ECR
-aws ecr get-login-password --region ap-southeast-1 | docker login --username AWS --password-stdin <account>.dkr.ecr.ap-southeast-1.amazonaws.com
+# SSH into instance
+ssh -i your-key.pem ubuntu@your-ec2-ip
 
-docker tag finance-backend:latest <account>.dkr.ecr.ap-southeast-1.amazonaws.com/finance-backend:latest
-docker push <account>.dkr.ecr.ap-southeast-1.amazonaws.com/finance-backend:latest
+# Run automated setup
+sudo bash deployment/setup_ec2.sh
 
-# Deploy with CloudFormation or Terraform
-./deployment/production_deploy.sh
+# This installs:
+# ✅ Docker & Docker Compose
+# ✅ Nginx reverse proxy
+# ✅ Certbot for SSL
+# ✅ AWS CLI
+# ✅ Monitoring tools
+# ✅ Firewall configuration
+# ✅ 2GB Swap file
 ```
 
-### Health Checks
+#### Step 2: Clone and Configure
 
 ```bash
+# Clone repository
+cd ~
+git clone https://github.com/lephucchi/finance_portfolio.git
+cd finance_portfolio
+
+# Configure environment files
+cp airflow/.env.example airflow/.env
+cp web_executor/backend/.env.example web_executor/backend/.env
+cp web_executor/frontend/.env.example web_executor/frontend/.env
+
+# Edit with your credentials
+nano airflow/.env
+nano web_executor/backend/.env
+nano web_executor/frontend/.env
+```
+
+#### Step 3: Deploy Application
+
+```bash
+# Run production deployment script
+bash deployment/deploy_production.sh
+
+# This will:
+# 1. Create backups
+# 2. Pull latest code
+# 3. Build Docker images
+# 4. Start all services
+# 5. Run health checks
+# 6. Display status
+```
+
+#### Step 4: Configure Nginx (Optional but Recommended)
+
+```bash
+# Copy and configure Nginx
+sudo cp deployment/nginx.conf /etc/nginx/sites-available/finance-portfolio
+sudo nano /etc/nginx/sites-available/finance-portfolio  # Update domain
+
+# Enable site
+sudo ln -s /etc/nginx/sites-available/finance-portfolio /etc/nginx/sites-enabled/
+sudo rm /etc/nginx/sites-enabled/default
+
+# Test and reload
+sudo nginx -t
+sudo systemctl reload nginx
+
+# Setup SSL with Let's Encrypt
+sudo certbot --nginx -d your-domain.com -d www.your-domain.com
+```
+
+### CI/CD Pipeline (GitHub Actions)
+
+Automated deployment on every push to `main`:
+
+#### Pipeline Stages
+
+```yaml
+1. Test Backend
+   ├── Lint with flake8
+   ├── Run pytest
+   └── Upload coverage
+
+2. Test Frontend
+   ├── Type check (TypeScript)
+   ├── Run tests
+   └── Build production bundle
+
+3. Build & Push to ECR
+   ├── Build Docker images
+   ├── Tag with commit SHA
+   └── Push to AWS ECR
+
+4. Deploy to Production
+   ├── SSH to EC2
+   ├── Pull latest images
+   ├── Restart services
+   └── Health checks
+
+5. Rollback on Failure
+   └── Automatic rollback if deployment fails
+```
+
+#### Setup GitHub Secrets
+
+Navigate to: **Settings → Secrets and variables → Actions**
+
+Add the following secrets:
+
+| Secret | Description |
+|--------|-------------|
+| `AWS_ACCESS_KEY_ID` | AWS IAM access key |
+| `AWS_SECRET_ACCESS_KEY` | AWS IAM secret key |
+| `EC2_HOST` | EC2 public IP or domain |
+| `EC2_SSH_PRIVATE_KEY` | SSH private key (.pem content) |
+
+#### Trigger Deployment
+
+```bash
+# Push to main triggers deployment
+git add .
+git commit -m "feat: new feature"
+git push origin main
+
+# Monitor pipeline
+# Visit: https://github.com/lephucchi/finance_portfolio/actions
+```
+
+### Monitoring & Health Checks
+
+```bash
+# Check all services
+docker-compose ps
+
 # API Health
 curl http://localhost:8000/health
+curl http://your-domain.com/health
 
-# Database
-psql $DATABASE_URL -c "SELECT 1"
+# View logs
+docker-compose logs -f backend
+docker-compose logs -f frontend
+docker-compose logs -f airflow-scheduler
 
-# AWS S3
-aws s3 ls s3://bankanalystportfolio/
+# System resources
+docker stats
 
-# Airflow DAGs
-airflow dags list
+# Disk usage
+df -h
+docker system df
 ```
+
+### Backup & Restore
+
+```bash
+# Create manual backup
+docker-compose exec postgres pg_dump -U airflow airflow > backup_$(date +%Y%m%d).sql
+
+# Restore from backup
+cat backup_20251105.sql | docker-compose exec -T postgres psql -U airflow airflow
+
+# Automated backups (in deploy_production.sh)
+# - Database: PostgreSQL dumps
+# - Logs: Compressed archives
+# - Retention: Last 7 days
+```
+
+### Rollback Deployment
+
+```bash
+# Rollback to previous version
+bash deployment/deploy_production.sh rollback <timestamp>
+
+# Or manually
+cd ~/finance_portfolio
+git reset --hard HEAD~1
+docker-compose down
+docker-compose up -d
+```
+
+### Scaling Considerations
+
+| Component | Scaling Strategy |
+|-----------|------------------|
+| **Backend** | Horizontal: Add more containers behind load balancer |
+| **Frontend** | CDN: Deploy to Cloudflare/CloudFront |
+| **Database** | Vertical: Upgrade instance + Read replicas |
+| **Airflow** | Celery Executor: Multiple workers |
+| **Storage** | S3: Auto-scales, no limit |
+
+### Production Checklist
+
+Before going live:
+
+- [x] Docker Compose configured
+- [x] All .env files setup
+- [x] SSL certificate installed
+- [x] Security groups configured
+- [x] CI/CD pipeline tested
+- [x] Monitoring setup
+- [x] Backups automated
+- [x] Health checks passing
+- [x] Documentation complete
+- [ ] Load testing performed
+- [ ] Disaster recovery plan
+- [ ] Team training completed
+
+For detailed deployment instructions, see: **[DEPLOYMENT_GUIDE.md](deployment/DEPLOYMENT_GUIDE.md)**
 
 ---
 

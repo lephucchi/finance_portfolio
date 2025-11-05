@@ -3,9 +3,13 @@ version: '3.8'
 x-airflow-common:
   &airflow-common
   # Use custom image with vnstock dependencies
-  build: .
+  build:
+    context: .
+    dockerfile: ./airflow/Dockerfile
   # Apache Airflow official image
   # image: apache/airflow:2.9.2-python3.10
+  env_file:
+    - ./airflow/.env
   environment:
     &airflow-common-env
     AIRFLOW__CORE__EXECUTOR: LocalExecutor
@@ -49,6 +53,8 @@ x-airflow-common:
     # Mount entire project for script access
     - ${AIRFLOW_PROJ_DIR:-.}:/opt/airflow/finance_portfolio
   user: "${AIRFLOW_UID:-50000}:0"
+  networks:
+    - finance_network
   depends_on:
     &airflow-common-depends-on
     redis:
@@ -74,6 +80,8 @@ services:
     restart: always
     ports:
       - "5432:5432"
+    networks:
+      - finance_network
 
   # Redis for Celery
   redis:
@@ -87,6 +95,8 @@ services:
       retries: 50
       start_period: 30s
     restart: always
+    networks:
+      - finance_network
 
   # Airflow Webserver
   airflow-webserver:
@@ -142,6 +152,8 @@ services:
   airflow-init:
     <<: *airflow-common
     entrypoint: /entrypoint
+    env_file:
+      - ./airflow/.env
     command:
       - bash
       - -c
@@ -165,6 +177,67 @@ services:
       _AIRFLOW_WWW_USER_USERNAME: ${_AIRFLOW_WWW_USER_USERNAME:-admin}
       _AIRFLOW_WWW_USER_PASSWORD: ${_AIRFLOW_WWW_USER_PASSWORD:-admin123}
     user: "0:0"
+
+  # ========================================
+  # WEB EXECUTOR SERVICES
+  # ========================================
+
+  # Backend API Service
+  backend:
+    build:
+      context: ./web_executor/backend
+      dockerfile: Dockerfile
+    container_name: finance-backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./web_executor/backend/.env
+    environment:
+      - ENVIRONMENT=production
+      - DEBUG=false
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./web_executor/backend/logs:/app/logs
+      - ./web_executor/backend/data:/app/data
+    restart: unless-stopped
+    networks:
+      - finance_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Frontend Service
+  frontend:
+    build:
+      context: ./web_executor/frontend
+      dockerfile: Dockerfile
+    container_name: finance-frontend
+    ports:
+      - "5173:5173"
+    env_file:
+      - ./web_executor/frontend/.env
+    environment:
+      - NODE_ENV=production
+      - VITE_API_BASE_URL=http://backend:8000/api/v1
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - finance_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5173/health", "||", "exit", "1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  finance_network:
+    driver: bridge
 
 volumes:
   postgres-db-volume:

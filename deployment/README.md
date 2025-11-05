@@ -1,213 +1,228 @@
-# Deployment Scripts - Finance Portfolio ETL Pipeline
+# 🚀 Deployment Files
 
-This folder contains production deployment and testing scripts for the Finance Portfolio ETL Pipeline.
+This directory contains all deployment and operational scripts for Finance Portfolio.
 
-## 📋 Available Scripts
+## 📁 Files Overview
 
-### 1. **test_master_dag_e2e.sh** - End-to-End Testing
-Comprehensive end-to-end test for the entire master pipeline through Docker.
+| File | Purpose | Usage |
+|------|---------|-------|
+| **setup_ec2.sh** | Initial EC2 setup | `sudo bash setup_ec2.sh` |
+| **deploy_production.sh** | Production deployment | `bash deploy_production.sh` |
+| **monitor.sh** | Health monitoring | `bash monitor.sh` |
+| **maintenance.sh** | System maintenance | `bash maintenance.sh` |
+| **nginx.conf** | Nginx configuration | Copy to `/etc/nginx/sites-available/` |
+| **DEPLOYMENT_GUIDE.md** | Complete deployment guide | Read for instructions |
 
-**Usage:**
+## 🛠️ Quick Start
+
+### 1. Initial EC2 Setup
+
 ```bash
-./deployment/test_master_dag_e2e.sh
+# SSH to EC2
+ssh -i your-key.pem ubuntu@your-ec2-ip
+
+# Copy and run setup script
+sudo bash setup_ec2.sh
+
+# Logout and login to apply docker group
+exit
+ssh -i your-key.pem ubuntu@your-ec2-ip
 ```
 
-**What it tests:**
-- ✅ Docker environment validation
-- ✅ DAG import and structure validation
-- ✅ All pipeline tasks (Bronze → Silver → Gold → RAG)
-- ✅ Master pipeline coordination
-- ✅ S3 data structure validation
-- ✅ Production readiness checklist
+### 2. Deploy Application
 
-**Output:**
-- Creates detailed logs in `./test_logs/` directory
-- Shows pass/fail status for each component
-- Generates production readiness report
-
----
-
-### 2. **trigger_master_pipeline.sh** - Production Pipeline Trigger
-Triggers the master pipeline and monitors execution in real-time.
-
-**Usage:**
 ```bash
-# Trigger for today
-./deployment/trigger_master_pipeline.sh
+# Clone repository
+git clone https://github.com/lephucchi/finance_portfolio.git
+cd finance_portfolio
 
-# Trigger for specific date
-./deployment/trigger_master_pipeline.sh 2025-10-25
+# Configure environment
+cp airflow/.env.example airflow/.env
+cp web_executor/backend/.env.example web_executor/backend/.env
+cp web_executor/frontend/.env.example web_executor/frontend/.env
+
+# Edit .env files with your credentials
+nano airflow/.env
+nano web_executor/backend/.env
+nano web_executor/frontend/.env
+
+# Deploy
+bash deployment/deploy_production.sh
 ```
 
-**Features:**
-- 🚀 Triggers master_pipeline DAG
-- 📊 Real-time execution monitoring
-- ✅ Shows task states and progress
-- 📝 Provides useful commands for debugging
+### 3. Configure Nginx (Optional)
 
----
-
-### 3. **docker_health_check.sh** - Docker Environment Health
-Quick health check for Docker environment and Airflow services.
-
-**Usage:**
 ```bash
-./deployment/docker_health_check.sh
+# Copy config
+sudo cp deployment/nginx.conf /etc/nginx/sites-available/finance-portfolio
+
+# Edit domain
+sudo nano /etc/nginx/sites-available/finance-portfolio
+
+# Enable site
+sudo ln -s /etc/nginx/sites-available/finance-portfolio /etc/nginx/sites-enabled/
+sudo rm /etc/nginx/sites-enabled/default
+
+# Test and reload
+sudo nginx -t
+sudo systemctl reload nginx
+
+# Setup SSL
+sudo certbot --nginx -d your-domain.com
 ```
 
----
+### 4. Setup Monitoring
 
-### 4. **production_deploy.sh** - Production Deployment
-Full production deployment with pre-checks and post-validation.
-
-**Usage:**
 ```bash
-./deployment/production_deploy.sh
+# Make scripts executable
+chmod +x deployment/monitor.sh
+chmod +x deployment/maintenance.sh
+
+# Run monitoring
+bash deployment/monitor.sh
+
+# Schedule monitoring (every 5 minutes)
+crontab -e
+# Add: */5 * * * * /home/ubuntu/finance_portfolio/deployment/monitor.sh
+
+# Schedule maintenance (weekly, Sunday 2 AM)
+# Add: 0 2 * * 0 /home/ubuntu/finance_portfolio/deployment/maintenance.sh
 ```
 
----
+## 📋 Deployment Checklist
 
-### 5. **rollback.sh** - Emergency Rollback
-Rollback to previous stable version in case of issues.
+Before deploying:
 
-**Usage:**
-```bash
-./deployment/rollback.sh
-```
+- [ ] EC2 instance launched (t2.large recommended)
+- [ ] Security groups configured (ports 22, 80, 443, 5173, 8000, 8080)
+- [ ] All .env files configured
+- [ ] AWS credentials valid
+- [ ] Domain DNS configured (if using custom domain)
+- [ ] SSL certificate ready (optional)
 
----
+After deploying:
 
-## 🔧 Prerequisites
+- [ ] All services running (`docker-compose ps`)
+- [ ] Health checks passing (`curl http://localhost:8000/health`)
+- [ ] Logs clean (`docker-compose logs -f`)
+- [ ] Monitoring working (`bash deployment/monitor.sh`)
+- [ ] Backups scheduled
+- [ ] CI/CD pipeline tested
 
-1. **Docker & Docker Compose installed**
-   ```bash
-   docker --version
-   docker-compose --version
-   ```
+## 🔄 Common Operations
 
-2. **Environment variables set**
-   - Create `.env` file with:
-   ```
-   AWS_ACCESS_KEY_ID=your_key
-   AWS_SECRET_ACCESS_KEY=your_secret
-   AWS_DEFAULT_REGION=ap-southeast-1
-   S3_BUCKET=bankanalystportfolio
-   ```
+### View Service Status
 
-3. **Docker services running**
-   ```bash
-   docker-compose up -d
-   ```
-
----
-
-## 📊 Testing Workflow
-
-### Pre-Production Testing
-```bash
-# 1. Check Docker health
-./deployment/docker_health_check.sh
-
-# 2. Run comprehensive E2E test
-./deployment/test_master_dag_e2e.sh
-
-# 3. Review test logs
-ls -lh ./test_logs/
-
-# 4. If all tests pass, proceed to deployment
-./deployment/production_deploy.sh
-```
-
-### Production Execution
-```bash
-# Trigger pipeline manually
-./deployment/trigger_master_pipeline.sh
-
-# Or let scheduler run automatically based on cron schedule
-# master_pipeline: 6:00 AM weekdays
-# bronze_layer: 6:00 AM weekdays
-# silver_layer: 7:00 AM weekdays
-# gold_layer: 8:00 AM weekdays
-# rag_pipeline: 9:00 AM weekdays
-```
-
----
-
-## 🐛 Troubleshooting
-
-### Container not running
 ```bash
 docker-compose ps
-docker-compose up -d
+```
+
+### View Logs
+
+```bash
+# All services
+docker-compose logs -f
+
+# Specific service
+docker-compose logs -f backend
+docker-compose logs -f frontend
 docker-compose logs -f airflow-scheduler
 ```
 
-### DAG import errors
+### Restart Services
+
 ```bash
-docker exec finance_portfolio-airflow-scheduler-1 airflow dags list-import-errors
+# All services
+docker-compose restart
+
+# Specific service
+docker-compose restart backend
 ```
 
-### View task logs
+### Update Deployment
+
 ```bash
-docker exec finance_portfolio-airflow-scheduler-1 \
-  airflow tasks log <dag_id> <task_id> <execution_date>
+cd ~/finance_portfolio
+git pull origin main
+docker-compose build
+docker-compose up -d --force-recreate
 ```
 
-### Check S3 data
+### Rollback
+
 ```bash
-aws s3 ls s3://bankanalystportfolio/ --recursive | grep "$(date +%Y-%m-%d)"
+bash deployment/deploy_production.sh rollback <timestamp>
+```
+
+### Run Maintenance
+
+```bash
+bash deployment/maintenance.sh
+```
+
+### Check Health
+
+```bash
+bash deployment/monitor.sh
+```
+
+## 🐛 Troubleshooting
+
+### Container won't start
+
+```bash
+# Check logs
+docker-compose logs backend
+
+# Check disk space
+df -h
+
+# Restart
+docker-compose restart backend
+```
+
+### Out of memory
+
+```bash
+# Check memory
+free -h
+
+# Restart services
+docker-compose restart
+
+# Consider upgrading instance
+```
+
+### Port conflicts
+
+```bash
+# Find process
+sudo lsof -i :8000
+
+# Kill process
+sudo kill -9 <PID>
+```
+
+### SSL issues
+
+```bash
+# Renew certificate
+sudo certbot renew
+
+# Check expiration
+sudo certbot certificates
+```
+
+## 📞 Support
+
+For detailed instructions, see: **[DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md)**
+
+Issues? Check logs and monitoring first:
+```bash
+bash deployment/monitor.sh
+docker-compose logs -f
 ```
 
 ---
 
-## 📈 Monitoring
-
-### Airflow Web UI
-- URL: http://localhost:8080
-- Username: admin
-- Password: admin123 (or check `.env`)
-
-### Check Pipeline Status
-```bash
-# DAG state
-docker exec finance_portfolio-airflow-scheduler-1 \
-  airflow dags state master_pipeline $(date +%Y-%m-%d)
-
-# Task states
-docker exec finance_portfolio-airflow-scheduler-1 \
-  airflow tasks states-for-dag-run master_pipeline $(date +%Y-%m-%d)
-```
-
----
-
-## 🔐 Security Notes
-
-- Never commit `.env` file with real credentials
-- Use AWS IAM roles in production
-- Rotate credentials regularly
-- Monitor S3 access logs
-
----
-
-## 📝 Change Log
-
-### Version 2.0 (October 2025)
-- ✅ Master DAG orchestration implemented
-- ✅ Bronze → Silver → Gold → RAG pipeline
-- ✅ Enhanced logging and metadata tracking
-- ✅ Production-ready Docker deployment
-- ✅ Comprehensive E2E testing
-
----
-
-## 👥 Support
-
-For issues or questions:
-1. Check logs in `./test_logs/` and `./airflow/logs/`
-2. Review documentation in `./docs/`
-3. Contact: Banking Portfolio Team
-
----
-
-**Last Updated:** October 25, 2025  
-**Version:** 2.0 - Production Ready
+**Last Updated**: November 5, 2025
