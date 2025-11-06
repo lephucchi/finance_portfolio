@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { FileText, TrendingUp, AlertCircle, Loader, RefreshCw, Construction } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/hooks/useI18n";
 
 // Mock data for demo
 const MOCK_SENTIMENT_DATA = {
@@ -78,13 +79,13 @@ function LoadingSpinner() {
   );
 }
 
-function ErrorAlert({ message }: { message: string }) {
+function ErrorAlert({ message, title }: { message: string; title: string }) {
   return (
     <div className="card-lumina border-l-4 border-accent bg-accent/10">
       <div className="flex gap-3">
         <AlertCircle className="w-5 h-5 text-accent flex-shrink-0 mt-0.5" />
         <div>
-          <h3 className="font-semibold text-foreground">Error Loading Data</h3>
+          <h3 className="font-semibold text-foreground">{title}</h3>
           <p className="text-sm text-muted-foreground mt-1">{message}</p>
         </div>
       </div>
@@ -92,17 +93,17 @@ function ErrorAlert({ message }: { message: string }) {
   );
 }
 
-function DevelopmentWarning() {
+function DevelopmentWarning({ title, message }: { title: string; message: string }) {
   return (
     <div className="card-lumina border-l-4 border-yellow-500 bg-yellow-50">
       <div className="flex gap-3">
         <Construction className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
         <div>
           <h3 className="font-semibold text-yellow-900 flex items-center gap-2">
-            🚧 Under Development - Demo Data Only
+            {title}
           </h3>
           <p className="text-sm text-yellow-800 mt-1">
-            This feature is currently under development. All data shown below is simulated for demonstration purposes and does not reflect real market sentiment or news analysis.
+            {message}
           </p>
         </div>
       </div>
@@ -110,16 +111,16 @@ function DevelopmentWarning() {
   );
 }
 
-function SentimentBadge({ sentiment }: { sentiment: number }) {
+function SentimentBadge({ sentiment, t }: { sentiment: number; t: (key: string) => string }) {
   let color = "bg-muted/50 text-muted-foreground";
-  let label = "Neutral";
+  let label = t('news.sentiment.neutral');
 
   if (sentiment >= 0.3) {
     color = "bg-primary/20 text-primary";
-    label = "Positive";
+    label = t('news.sentiment.positive');
   } else if (sentiment <= -0.3) {
     color = "bg-accent/20 text-accent";
-    label = "Negative";
+    label = t('news.sentiment.negative');
   }
 
   return (
@@ -130,6 +131,7 @@ function SentimentBadge({ sentiment }: { sentiment: number }) {
 }
 
 export default function News() {
+  const { t, language } = useI18n();
   const [sentimentSummary, setSentimentSummary] = useState<any[]>([]);
   const [sentimentOverall, setSentimentOverall] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
@@ -169,10 +171,10 @@ export default function News() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold text-foreground">
-                Market Insights
+                {t('news.title')}
               </h1>
               <p className="text-sm text-muted-foreground mt-2">
-                News sentiment analysis and financial intelligence
+                {t('news.subtitle')}
               </p>
             </div>
             <button
@@ -185,7 +187,7 @@ export default function News() {
               )}
             >
               <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
-              Refresh
+              {t('news.refreshButton')}
             </button>
           </div>
         </div>
@@ -206,14 +208,14 @@ export default function News() {
           <div>
             <div className="flex items-center gap-3">
               <h1 className="text-3xl font-bold text-foreground">
-                Market Insights
+                {t('news.title')}
               </h1>
               <span className="px-3 py-1 bg-yellow-100 text-yellow-800 text-xs font-semibold rounded-full border border-yellow-300">
-                🚧 DEMO
+                {t('news.demoTag')}
               </span>
             </div>
             <p className="text-sm text-muted-foreground mt-2">
-              News sentiment analysis and financial intelligence (Demo Version)
+              {t('news.subtitleDemo')}
             </p>
           </div>
           <button
@@ -226,54 +228,54 @@ export default function News() {
             )}
           >
             <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
-            Refresh
+            {t('news.refreshButton')}
           </button>
         </div>
       </div>
 
       {/* Development Warning */}
-      <DevelopmentWarning />
+      <DevelopmentWarning title={t('news.developmentWarning') as string} message={t('news.developmentWarningText') as string} />
 
       {/* Stats */}
       {sentimentOverall && sentimentSummary && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="card-lumina">
             <p className="text-xs text-muted-foreground font-medium mb-2">
-              Total Articles
+              {t('news.stats.totalArticles')}
             </p>
             <p className="text-2xl font-bold text-foreground">
               {sentimentOverall.total_articles}
             </p>
             <p className="text-xs text-primary mt-2">
-              {sentimentSummary.length} days analyzed
+              {sentimentSummary.length} {t('news.stats.daysAnalyzed')}
             </p>
           </div>
 
           <div className="card-lumina">
             <p className="text-xs text-muted-foreground font-medium mb-2">
-              Overall Sentiment
+              {t('news.stats.overallSentiment')}
             </p>
             <p className="text-2xl font-bold text-foreground">
               {sentimentOverall.avg_sentiment.toFixed(2)}
             </p>
             <p className="text-xs text-primary mt-2">
-              {sentimentOverall.dominant_sentiment === "positive"
-                ? "Bullish"
-                : sentimentOverall.dominant_sentiment === "negative"
-                  ? "Bearish"
-                  : "Neutral"}
+              {sentimentOverall.avg_sentiment >= 0.3
+                ? t('news.sentiment.bullish')
+                : sentimentOverall.avg_sentiment <= -0.3
+                  ? t('news.sentiment.bearish')
+                  : t('news.sentiment.neutral')}
             </p>
           </div>
 
           {recentSentiment && (
             <div className="card-lumina">
               <p className="text-xs text-muted-foreground font-medium mb-2">
-                Latest Update ({recentSentiment.date})
+                {t('news.stats.latestUpdate')} ({recentSentiment.date})
               </p>
               <p className="text-2xl font-bold text-foreground">
                 {recentSentiment.positive_pct.toFixed(0)}%
               </p>
-              <p className="text-xs text-primary mt-2">Positive Sentiment</p>
+              <p className="text-xs text-primary mt-2">{t('news.stats.positiveArticles')}</p>
             </div>
           )}
         </div>
@@ -283,7 +285,7 @@ export default function News() {
       <div className="card-lumina">
         <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
           <FileText className="w-5 h-5 text-primary" />
-          Daily Sentiment Breakdown
+          {t('news.dailyBreakdown')}
         </h2>
         {sentimentSummary.length > 0 ? (
           <div className="space-y-3">
@@ -298,17 +300,17 @@ export default function News() {
                   <div className="flex items-start justify-between mb-3">
                     <div>
                       <h3 className="font-semibold text-foreground">
-                        {new Date(day.date).toLocaleDateString("en-US", {
+                        {new Date(day.date).toLocaleDateString(language === 'vi' ? 'vi-VN' : 'en-US', {
                           weekday: "long",
                           month: "short",
                           day: "numeric",
                         })}
                       </h3>
                       <p className="text-xs text-muted-foreground">
-                        {day.total_articles} articles analyzed
+                        {day.total_articles} {t('news.articlesAnalyzed')}
                       </p>
                     </div>
-                    <SentimentBadge sentiment={day.avg_sentiment} />
+                    <SentimentBadge sentiment={day.avg_sentiment} t={t} />
                   </div>
 
                   <div className="flex gap-4 mb-3">
@@ -322,7 +324,7 @@ export default function News() {
                         />
                       </div>
                       <span className="text-xs text-primary font-medium">
-                        👍 {day.positive_pct.toFixed(1)}%
+                        {t('news.positiveLabel')} {day.positive_pct.toFixed(1)}%
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
@@ -335,7 +337,7 @@ export default function News() {
                         />
                       </div>
                       <span className="text-xs text-accent font-medium">
-                        👎 {day.negative_pct.toFixed(1)}%
+                        {t('news.negativeLabel')} {day.negative_pct.toFixed(1)}%
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
@@ -348,20 +350,20 @@ export default function News() {
                         />
                       </div>
                       <span className="text-xs text-muted-foreground font-medium">
-                        😐 {day.neutral_pct.toFixed(1)}%
+                        {t('news.neutralLabel')} {day.neutral_pct.toFixed(1)}%
                       </span>
                     </div>
                   </div>
 
                   <div className="flex gap-2">
                     <span className="text-xs px-2 py-1 rounded-lg bg-primary/10 text-primary">
-                      Positive: {day.positive_count}
+                      {t('news.positiveCount')} {day.positive_count}
                     </span>
                     <span className="text-xs px-2 py-1 rounded-lg bg-accent/10 text-accent">
-                      Negative: {day.negative_count}
+                      {t('news.negativeCount')} {day.negative_count}
                     </span>
                     <span className="text-xs px-2 py-1 rounded-lg bg-muted/10 text-muted-foreground">
-                      Neutral: {day.neutral_count}
+                      {t('news.neutralCount')} {day.neutral_count}
                     </span>
                   </div>
                 </div>
@@ -369,7 +371,7 @@ export default function News() {
           </div>
         ) : (
           <div className="py-8 text-center text-muted-foreground">
-            No sentiment data available
+            {t('news.noData')}
           </div>
         )}
       </div>
@@ -378,31 +380,31 @@ export default function News() {
       <div className="card-lumina">
         <h3 className="font-semibold text-foreground mb-3 flex items-center gap-2">
           <TrendingUp className="w-4 h-4" />
-          Sentiment Interpretation
+          {t('news.interpretation.title')}
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <div className="p-3 rounded-lg bg-primary/10 border border-primary/20">
             <p className="text-xs font-medium text-primary mb-1">
-              Positive (≥ 0.3)
+              {t('news.interpretation.positive')}
             </p>
             <p className="text-xs text-muted-foreground">
-              Bullish sentiment with strong positive coverage
+              {t('news.interpretation.positiveDesc')}
             </p>
           </div>
           <div className="p-3 rounded-lg bg-muted/10 border border-muted/20">
             <p className="text-xs font-medium text-muted-foreground mb-1">
-              Neutral (-0.3 to 0.3)
+              {t('news.interpretation.neutral')}
             </p>
             <p className="text-xs text-muted-foreground">
-              Mixed or balanced market sentiment
+              {t('news.interpretation.neutralDesc')}
             </p>
           </div>
           <div className="p-3 rounded-lg bg-accent/10 border border-accent/20">
             <p className="text-xs font-medium text-accent mb-1">
-              Negative (≤ -0.3)
+              {t('news.interpretation.negative')}
             </p>
             <p className="text-xs text-muted-foreground">
-              Bearish sentiment with negative coverage
+              {t('news.interpretation.negativeDesc')}
             </p>
           </div>
         </div>
@@ -414,18 +416,17 @@ export default function News() {
           <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
           <div>
             <h3 className="font-semibold text-yellow-900 mb-2">
-              📊 Demo Data Notice
+              {t('news.disclaimer.title')}
             </h3>
             <p className="text-sm text-yellow-800 mb-2">
-              <strong>Important:</strong> This Market Insights feature is currently in development. 
-              All sentiment scores, article counts, and trends displayed above are simulated data 
-              for demonstration purposes only.
+              <strong>{t('news.disclaimer.important')}</strong> {t('news.disclaimer.message')}
             </p>
             <ul className="text-xs text-yellow-700 space-y-1 list-disc list-inside">
-              <li>No real news sources are being analyzed</li>
-              <li>Sentiment scores are randomly generated</li>
-              <li>Data does not reflect actual market conditions</li>
-              <li>Do not use this information for investment decisions</li>
+              {['No real news sources are being analyzed', 'Sentiment scores are randomly generated', 'Data does not reflect actual market conditions', 'Do not use this information for investment decisions'].map((point: string, index: number) => (
+                <li key={index}>{language === 'vi' ? 
+                  ['Không có nguồn tin tức thực tế nào được phân tích', 'Điểm cảm xúc được tạo ngẫu nhiên', 'Dữ liệu không phản ánh điều kiện thị trường thực tế', 'Không sử dụng thông tin này để quyết định đầu tư'][index]
+                  : point}</li>
+              ))}
             </ul>
           </div>
         </div>
