@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { Send, Trash2, Eye, Key, CheckCircle, XCircle, Settings } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { useI18n } from "@/hooks/useI18n";
 
 interface Message {
   id: string;
@@ -25,12 +26,15 @@ const DISCOVERIES = [
 ];
 
 export default function Chat() {
+  const { t, language } = useI18n();
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "1",
       role: "oracle",
       content:
-        "✨ Xin chào! Tôi là trợ lý tài chính AI. Tôi có thể giúp bạn phân tích thị trường chứng khoán Việt Nam. Bạn muốn tìm hiểu điều gì?",
+        language === 'vi' 
+          ? "✨ Xin chào! Tôi là trợ lý tài chính AI. Tôi có thể giúp bạn phân tích thị trường chứng khoán Việt Nam. Bạn muốn tìm hiểu điều gì?"
+          : "✨ Hello! I am an AI financial assistant. I can help you analyze the Vietnamese stock market. What would you like to learn?",
       timestamp: new Date(),
     },
   ]);
@@ -165,7 +169,7 @@ export default function Chat() {
           const oracleMessage: Message = {
             id: (Date.now() + 1).toString(),
             role: "oracle",
-            content: data.answer || "Đang xử lý yêu cầu của bạn...",
+            content: data.answer || t('oracleChat.processingMessage'),
             timestamp: new Date(data.timestamp),
             sources: data.sources,
           };
@@ -181,7 +185,7 @@ export default function Chat() {
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: "oracle",
-        content: "Xin lỗi, tôi gặp vấn đề khi xử lý câu hỏi. Vui lòng thử lại sau.",
+        content: t('oracleChat.errorMessage'),
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, errorMessage]);
@@ -195,8 +199,7 @@ export default function Chat() {
       {
         id: "1",
         role: "oracle",
-        content:
-          "✨ Xin chào! Tôi là trợ lý tài chính AI. Tôi có thể giúp bạn phân tích thị trường chứng khoán Việt Nam. Bạn muốn tìm hiểu điều gì?",
+        content: t('oracleChat.initialMessage'),
         timestamp: new Date(),
       },
     ]);
@@ -212,10 +215,10 @@ export default function Chat() {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-foreground">
-              Trợ lý Tài chính AI
+              {t('oracleChat.headerTitle')}
             </h1>
             <p className="text-xs text-muted-foreground">
-              RAG-powered Vietnamese market insights
+              {t('oracleChat.headerSubtitle')}
             </p>
           </div>
         </div>
@@ -224,26 +227,26 @@ export default function Chat() {
           {apiKeyValid === true && (
             <div className="flex items-center gap-1 text-green-600 text-xs">
               <CheckCircle className="w-3 h-3" />
-              <span>Connected</span>
+              <span>{t('oracleChat.statusConnected')}</span>
             </div>
           )}
           {apiKeyValid === false && (
             <div className="flex items-center gap-1 text-red-600 text-xs">
               <XCircle className="w-3 h-3" />
-              <span>No API key</span>
+              <span>{t('oracleChat.statusNoKey')}</span>
             </div>
           )}
           <button
             onClick={() => setShowSettings(!showSettings)}
             className="p-2 rounded-lg hover:bg-secondary/50 transition-colors"
-            title="API Settings"
+            title={t('oracleChat.settingsTitle')}
           >
             <Settings className="w-4 h-4" />
           </button>
           <button
             onClick={handleClearChat}
             className="p-2 rounded-lg hover:bg-secondary/50 transition-colors"
-            title="Clear chat"
+            title={t('oracleChat.clearChat')}
           >
             <Trash2 className="w-4 h-4" />
           </button>
@@ -256,18 +259,18 @@ export default function Chat() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Key className="w-4 h-4 text-primary" />
-              <h3 className="font-semibold">Gemini API Key</h3>
+              <h3 className="font-semibold">{t('oracleChat.apiKeySettingsTitle')}</h3>
             </div>
             <button
               onClick={() => setShowSettings(false)}
               className="text-xs text-muted-foreground hover:text-foreground"
             >
-              Close
+              {t('oracleChat.closeButton')}
             </button>
           </div>
           
           <p className="text-xs text-muted-foreground">
-            Nhập API key của bạn từ{" "}
+            {t('oracleChat.apiKeyHint')}{" "}
             <a
               href="https://makersuite.google.com/app/apikey"
               target="_blank"
@@ -276,7 +279,7 @@ export default function Chat() {
             >
               Google AI Studio
             </a>{" "}
-            (miễn phí)
+            ({t('oracleChat.apiKeyFree')})
           </p>
 
           <div className="flex gap-2">
@@ -287,7 +290,7 @@ export default function Chat() {
                 setApiKey(e.target.value);
                 setApiKeyValid(null);
               }}
-              placeholder="AIzaSy..."
+              placeholder={t('oracleChat.apiKeyPlaceholder') as string}
               className="input-lumina flex-1 text-sm"
               disabled={isValidating}
             />
@@ -296,21 +299,21 @@ export default function Chat() {
               disabled={!apiKey.trim() || isValidating}
               className="btn-lumina-primary px-3 text-sm disabled:opacity-50"
             >
-              {isValidating ? "Checking..." : "Validate"}
+              {isValidating ? t('oracleChat.validatingButton') : t('oracleChat.validateButton')}
             </button>
           </div>
 
           {apiKeyValid === true && (
             <div className="flex items-center gap-2 text-green-600 text-xs bg-green-50 dark:bg-green-900/20 px-3 py-2 rounded">
               <CheckCircle className="w-4 h-4" />
-              <span>API key is valid! You can start chatting.</span>
+              <span>{t('oracleChat.validMessage')}</span>
             </div>
           )}
 
           {apiKeyValid === false && (
             <div className="flex items-center gap-2 text-red-600 text-xs bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded">
               <XCircle className="w-4 h-4" />
-              <span>Invalid API key. Please check and try again.</span>
+              <span>{t('oracleChat.invalidMessage')}</span>
             </div>
           )}
         </div>
@@ -348,7 +351,7 @@ export default function Chat() {
                       onClick={() => setShowSources(showSources === message.id ? null : message.id)}
                       className="text-xs text-primary hover:underline"
                     >
-                      {showSources === message.id ? "Ẩn" : "Xem"} {message.sources.length} nguồn tin
+                      {showSources === message.id ? t('oracleChat.sourcesLabel').split(' ')[0] : t('oracleChat.sourcesLabel').split(' ')[0]} {message.sources.length} {t('oracleChat.sourcesLabel').split(' ')[1]}
                     </button>
 
                     {showSources === message.id && (
@@ -356,7 +359,7 @@ export default function Chat() {
                         {message.sources.map((source, i) => (
                           <div key={i} className="text-xs bg-secondary/30 p-2 rounded">
                             <div className="font-medium text-primary mb-1">
-                              Nguồn {i + 1} ({(source.score * 100).toFixed(1)}% liên quan)
+                              {t('oracleChat.sourceLabel')} {i + 1} ({(source.score * 100).toFixed(1)}% {t('oracleChat.relatedLabel')})
                             </div>
                             <p className="line-clamp-3 text-muted-foreground">
                               {source.text}
@@ -403,10 +406,10 @@ export default function Chat() {
       {messages.length === 1 && !isLoading && apiKeyValid === true && (
         <div className="px-6 pb-4">
           <p className="text-xs text-muted-foreground mb-3 font-medium">
-            Câu hỏi gợi ý:
+            {t('oracleChat.suggestionsLabel')}
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-            {DISCOVERIES.map((disc, idx) => (
+            {(t('oracleChat.suggestedQuestionsData') as any || []).map((disc: string, idx: number) => (
               <button
                 key={idx}
                 onClick={() => handleSendMessage(disc)}
@@ -428,8 +431,8 @@ export default function Chat() {
           onKeyPress={(e) => e.key === "Enter" && !e.shiftKey && handleSendMessage()}
           placeholder={
             apiKeyValid === true
-              ? "Nhập câu hỏi của bạn..."
-              : "⚠️ Vui lòng cấu hình API key trước"
+              ? (t('oracleChat.inputPlaceholder') as string)
+              : (t('oracleChat.inputDisabledPlaceholder') as string)
           }
           className="input-lumina flex-1"
           disabled={isLoading || apiKeyValid !== true}

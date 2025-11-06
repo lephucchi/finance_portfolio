@@ -8,7 +8,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import ErrorBoundary from "./components/ErrorBoundary";
 import MainLayout from "./components/layout/MainLayout";
-import Home from "./pages/Home";
+import Homev2 from "./pages/Homev2";
 import Dashboard from "./pages/Dashboard";
 import News from "./pages/News";
 import Screener from "./pages/Screener";
@@ -31,7 +31,7 @@ const App = () => (
         <BrowserRouter>
           <MainLayout>
             <Routes>
-              <Route path="/" element={<Home />} />
+              <Route path="/" element={<Homev2 />} />
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/news" element={<News />} />
               <Route path="/screener" element={<Screener />} />

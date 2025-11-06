@@ -10,6 +10,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/hooks/useI18n";
 import {
   api,
   formatCurrency,
@@ -119,13 +120,13 @@ function LoadingSpinner() {
   );
 }
 
-function ErrorAlert({ message }: { message: string }) {
+function ErrorAlert({ message, title }: { message: string; title: string }) {
   return (
     <div className="card-lumina border-l-4 border-accent bg-accent/10">
       <div className="flex gap-3">
         <AlertCircle className="w-5 h-5 text-accent flex-shrink-0 mt-0.5" />
         <div>
-          <h3 className="font-semibold text-foreground">Error Loading Data</h3>
+          <h3 className="font-semibold text-foreground">{title}</h3>
           <p className="text-sm text-muted-foreground mt-1">{message}</p>
         </div>
       </div>
@@ -134,6 +135,7 @@ function ErrorAlert({ message }: { message: string }) {
 }
 
 export default function Dashboard() {
+  const { t, language } = useI18n();
   const [timeFrame, setTimeFrame] = useState("1d");
   const [selectedDate, setSelectedDate] = useState("2025-10-17"); // Latest available date
   const [dashboardData, setDashboardData] = useState<DashboardSummary | null>(
@@ -189,9 +191,9 @@ export default function Dashboard() {
     return (
       <div className="space-y-6">
         <div className="card-lumina">
-          <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
+          <h1 className="text-3xl font-bold text-foreground">{t('dashboard.title')}</h1>
           <p className="text-sm text-muted-foreground mt-2">
-            Real-time market insights and analytics
+            {t('dashboard.subtitle')}
           </p>
         </div>
         <LoadingSpinner />
@@ -203,12 +205,12 @@ export default function Dashboard() {
     return (
       <div className="space-y-6">
         <div className="card-lumina">
-          <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
+          <h1 className="text-3xl font-bold text-foreground">{t('dashboard.title')}</h1>
           <p className="text-sm text-muted-foreground mt-2">
-            Real-time market insights and analytics
+            {t('dashboard.subtitle')}
           </p>
         </div>
-        <ErrorAlert message={error} />
+        <ErrorAlert message={error} title={t('dashboard.errors.title') as string} />
       </div>
     );
   }
@@ -224,9 +226,9 @@ export default function Dashboard() {
           {/* Title and Controls Row */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
+              <h1 className="text-3xl font-bold text-foreground">{t('dashboard.title')}</h1>
               <p className="text-sm text-muted-foreground mt-2">
-                Real-time market insights and analytics
+                {t('dashboard.subtitle')}
               </p>
             </div>
 
@@ -239,7 +241,7 @@ export default function Dashboard() {
                   value={selectedDate}
                   onChange={(e) => setSelectedDate(e.target.value)}
                   className="text-sm font-medium text-gray-700 border-none focus:outline-none focus:ring-2 focus:ring-blue-500 rounded"
-                  title="Select any date to view historical data"
+                  title={t('dashboard.selectDate') as string}
                 />
               </div>
 
@@ -252,10 +254,10 @@ export default function Dashboard() {
                   "bg-secondary/50 text-foreground hover:bg-secondary",
                   isRefreshing && "opacity-50 cursor-not-allowed"
                 )}
-                title="Refresh data"
+                title={t('dashboard.refreshData') as string}
               >
                 <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
-                Refresh
+                {t('dashboard.refreshButton')}
               </button>
             </div>
           </div>
@@ -273,7 +275,7 @@ export default function Dashboard() {
                     : "bg-secondary/50 text-foreground hover:bg-secondary",
                 )}
               >
-                {tf}
+                {t(`dashboard.timeframes.${tf}` as any)}
               </button>
             ))}
           </div>
@@ -285,27 +287,27 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {[
             {
-              label: "Market Change",
+              label: t('dashboard.metrics.marketChange'),
               value: formatPercent(dashboardData.market.market_change_pct ?? 0),
-              change: `${dashboardData.market.total_stocks ?? 0} stocks`,
+              change: `${dashboardData.market.total_stocks ?? 0} ${t('dashboard.metrics.stocksCount')}`,
               positive: (dashboardData.market.market_change_pct ?? 0) >= 0,
             },
             {
-              label: "Advancing",
+              label: t('dashboard.metrics.advancing'),
               value: (dashboardData.market.advancing ?? 0).toString(),
-              change: `${dashboardData.market.declining ?? 0} declining`,
+              change: `${dashboardData.market.declining ?? 0} ${t('dashboard.metrics.decliningCount')}`,
               positive: true,
             },
             {
-              label: "Total Volume",
+              label: t('dashboard.metrics.totalVolume'),
               value: `${((dashboardData.market.total_volume ?? 0) / 1000000).toFixed(0)}M`,
-              change: "daily volume",
+              change: t('dashboard.metrics.dailyVolume'),
               positive: true,
             },
             {
-              label: "Avg Sentiment",
+              label: t('dashboard.metrics.avgSentiment'),
               value: (dashboardData.sentiment?.avg_score ?? 0).toFixed(2),
-              change: `${dashboardData.sentiment?.total_articles ?? 0} articles`,
+              change: `${dashboardData.sentiment?.total_articles ?? 0} ${t('dashboard.metrics.articles')}`,
               positive: (dashboardData.sentiment?.avg_score ?? 0) >= 0.3,
             },
           ].map((metric, idx) => {
@@ -345,7 +347,7 @@ export default function Dashboard() {
       {/* Main Chart */}
       <div className="card-lumina lg:col-span-2">
         <h2 className="text-lg font-semibold text-foreground mb-4">
-          Market Price Trend
+          {t('dashboard.chart.title')}
         </h2>
         {stocksData.length > 0 ? (
           <>
@@ -354,12 +356,12 @@ export default function Dashboard() {
             </div>
             <div className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
               <Zap className="w-3 h-3" />
-              Live data • {stocksData.length} data points • Updated every minute
+              {t('dashboard.chart.liveData')} • {stocksData.length} {t('dashboard.chart.dataPoints')} • {t('dashboard.chart.updatedEveryMinute')}
             </div>
           </>
         ) : (
           <div className="py-8 text-center text-muted-foreground">
-            No chart data available
+            {t('dashboard.chart.noData')}
           </div>
         )}
       </div>
@@ -370,7 +372,7 @@ export default function Dashboard() {
         <div className="card-lumina">
           <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
             <TrendingUp className="w-5 h-5 text-primary" />
-            Top Gainers
+            {t('dashboard.topGainers.title')}
           </h2>
           {topGainers.length > 0 ? (
             <div className="space-y-3">
@@ -385,7 +387,7 @@ export default function Dashboard() {
                         {asset.symbol}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        Vol: {(asset.volume / 1000000).toFixed(1)}M
+                        {t('dashboard.topGainers.volume')} {(asset.volume / 1000000).toFixed(1)}M
                       </p>
                     </div>
                     <div className="text-right">
@@ -402,7 +404,7 @@ export default function Dashboard() {
             </div>
           ) : (
             <div className="py-4 text-center text-muted-foreground">
-              No data available
+              {t('dashboard.topGainers.noData')}
             </div>
           )}
         </div>
@@ -411,14 +413,14 @@ export default function Dashboard() {
         <div className="card-lumina">
           <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
             <BarChart3 className="w-5 h-5 text-accent" />
-            Market Insights
+            {t('dashboard.insights.title')}
           </h2>
           <div className="space-y-3">
             {dashboardData?.market && dashboardData?.sentiment &&
               [
-                `Market change: ${formatPercent(dashboardData.market.market_change_pct ?? 0)}`,
-                `Sentiment: ${(dashboardData.sentiment.positive_pct ?? 0).toFixed(1)}% positive articles`,
-                `Volume strength: ${((dashboardData.market.total_volume ?? 0) / 1000000000).toFixed(1)}B shares`,
+                `${t('dashboard.marketChangeInsight')} ${formatPercent(dashboardData.market.market_change_pct ?? 0)}`,
+                `${t('dashboard.sentimentInsight')} ${(dashboardData.sentiment.positive_pct ?? 0).toFixed(1)}% ${t('dashboard.positiveArticles')}`,
+                `${t('dashboard.volumeStrength')} ${((dashboardData.market.total_volume ?? 0) / 1000000000).toFixed(1)} ${t('dashboard.sharesVolume')}`,
               ].map((insight, i) => (
                 <div
                   key={`insight-${i}`}
@@ -436,24 +438,24 @@ export default function Dashboard() {
       {/* Strategic Summary */}
       {dashboardData?.market && dashboardData?.sentiment && (
         <div className="card-lumina border-l-4 border-primary">
-          <h3 className="font-semibold text-primary mb-2">Market Overview</h3>
+          <h3 className="font-semibold text-primary mb-2">{t('dashboard.overview.title')}</h3>
           <p className="text-sm text-foreground leading-relaxed">
             {(dashboardData.market.advancing ?? 0) > (dashboardData.market.declining ?? 0)
-              ? `Market showing positive momentum with ${dashboardData.market.advancing} advancing stocks vs ${dashboardData.market.declining} declining. `
-              : `Market showing mixed signals with ${dashboardData.market.declining} declining stocks. `}
-            Sentiment score of {(dashboardData.sentiment.avg_score ?? 0).toFixed(2)}{" "}
-            indicates{" "}
+              ? `${t('dashboard.overview.positiveMessage')} ${dashboardData.market.advancing} ${t('dashboard.overview.advancingStocks')} ${dashboardData.market.declining} ${t('dashboard.overview.decliningStocks')} `
+              : `${t('dashboard.overview.negativeMessage')} ${dashboardData.market.declining} ${t('dashboard.overview.decliningStocksMessage')} `}
+            {t('dashboard.overview.sentiment')} {(dashboardData.sentiment.avg_score ?? 0).toFixed(2)}{" "}
+            {t('dashboard.overview.indicates')}{" "}
             {(dashboardData.sentiment.avg_score ?? 0) >= 0.3
-              ? "positive"
+              ? t('dashboard.overview.positive')
               : (dashboardData.sentiment.avg_score ?? 0) <= -0.3
-                ? "negative"
-                : "neutral"}{" "}
-            market sentiment based on {dashboardData.sentiment.total_articles ?? 0}{" "}
-            analyzed articles.
+                ? t('dashboard.overview.negative')
+                : t('dashboard.overview.neutral')}{" "}
+            {t('dashboard.overview.marketSentiment')} {dashboardData.sentiment.total_articles ?? 0}{" "}
+            {t('dashboard.overview.analyzedArticles')}
           </p>
           <p className="text-xs text-muted-foreground mt-3">
-            Last updated:{" "}
-            {dashboardData.latest_update ? new Date(dashboardData.latest_update).toLocaleString() : "N/A"}
+            {t('dashboard.overview.lastUpdated')}{" "}
+            {dashboardData.latest_update ? new Date(dashboardData.latest_update).toLocaleString(language === 'vi' ? 'vi-VN' : 'en-US') : t('dashboard.overview.notAvailable')}
           </p>
         </div>
       )}

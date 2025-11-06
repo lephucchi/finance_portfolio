@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Search, Sun, Moon, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
+import LanguageSwitcher from "./LanguageSwitcher";
 
 interface HeaderProps {
   isDarkMode: boolean;
@@ -54,6 +55,9 @@ export default function Header({ isDarkMode, onToggleDarkMode }: HeaderProps) {
 
         {/* Right Actions */}
         <div className="flex items-center gap-2 sm:gap-4">
+          {/* Language Switcher */}
+          <LanguageSwitcher />
+
           {/* Theme Toggle with Smooth Animation */}
           <button
             onClick={onToggleDarkMode}

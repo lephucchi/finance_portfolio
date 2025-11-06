@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { BarChart2, Zap, AlertCircle, Loader, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/hooks/useI18n";
 import { api, getDateRange, formatCurrency, formatPercent } from "@/lib/api";
 import type { StockData } from "@/lib/api";
 
@@ -12,13 +13,13 @@ function LoadingSpinner() {
   );
 }
 
-function ErrorAlert({ message }: { message: string }) {
+function ErrorAlert({ message, title }: { message: string; title: string }) {
   return (
     <div className="card-lumina border-l-4 border-accent bg-accent/10">
       <div className="flex gap-3">
         <AlertCircle className="w-5 h-5 text-accent flex-shrink-0 mt-0.5" />
         <div>
-          <h3 className="font-semibold text-foreground">Error Loading Data</h3>
+          <h3 className="font-semibold text-foreground">{title}</h3>
           <p className="text-sm text-muted-foreground mt-1">{message}</p>
         </div>
       </div>
@@ -27,6 +28,7 @@ function ErrorAlert({ message }: { message: string }) {
 }
 
 export default function Screener() {
+  const { t } = useI18n();
   const [stocks, setStocks] = useState<StockData[]>([]);
   const [filteredStocks, setFilteredStocks] = useState<StockData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -119,9 +121,9 @@ export default function Screener() {
         <div className="card-lumina">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-foreground">Asset Finder</h1>
+              <h1 className="text-3xl font-bold text-foreground">{t('screener.title')}</h1>
               <p className="text-sm text-muted-foreground mt-2">
-                Discover stocks matching your criteria
+                {t('screener.subtitle')}
               </p>
             </div>
             <button
@@ -134,7 +136,7 @@ export default function Screener() {
               )}
             >
               <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
-              Refresh
+              {t('screener.refreshButton')}
             </button>
           </div>
         </div>
@@ -149,9 +151,9 @@ export default function Screener() {
         <div className="card-lumina">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-foreground">Asset Finder</h1>
+              <h1 className="text-3xl font-bold text-foreground">{t('screener.title')}</h1>
               <p className="text-sm text-muted-foreground mt-2">
-                Discover stocks matching your criteria
+                {t('screener.subtitle')}
               </p>
             </div>
             <button
@@ -164,11 +166,11 @@ export default function Screener() {
               )}
             >
               <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
-              Refresh
+              {t('screener.refreshButton')}
             </button>
           </div>
         </div>
-        <ErrorAlert message={error} />
+        <ErrorAlert message={error} title={t('screener.errors.title') as string} />
       </div>
     );
   }
@@ -178,9 +180,9 @@ export default function Screener() {
       <div className="card-lumina">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">Asset Finder</h1>
+            <h1 className="text-3xl font-bold text-foreground">{t('screener.title')}</h1>
             <p className="text-sm text-muted-foreground mt-2">
-              Discover stocks matching your criteria
+              {t('screener.subtitle')}
             </p>
           </div>
           <button
@@ -193,7 +195,7 @@ export default function Screener() {
             )}
           >
             <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
-            Refresh
+            {t('screener.refreshButton')}
           </button>
         </div>
       </div>
@@ -202,16 +204,16 @@ export default function Screener() {
       <div className="card-lumina">
         <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
           <Zap className="w-5 h-5 text-primary" />
-          Search & Filter
+          {t('screener.filters.sectionTitle')}
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
           <div>
             <label className="text-xs font-medium text-muted-foreground block mb-2">
-              Symbol
+              {t('screener.filters.symbolLabel')}
             </label>
             <input
               type="text"
-              placeholder="e.g., VIC, VCB"
+              placeholder={t('screener.filters.symbolPlaceholder') as string}
               className="input-lumina w-full"
               value={filters.searchSymbol}
               onChange={(e) =>
@@ -221,11 +223,11 @@ export default function Screener() {
           </div>
           <div>
             <label className="text-xs font-medium text-muted-foreground block mb-2">
-              Min Change %
+              {t('screener.filters.minChangeLabel')}
             </label>
             <input
               type="number"
-              placeholder="-10"
+              placeholder={t('screener.filters.minChangePlaceholder') as string}
               className="input-lumina w-full"
               value={filters.minChange}
               onChange={(e) => handleFilterChange("minChange", e.target.value)}
@@ -233,11 +235,11 @@ export default function Screener() {
           </div>
           <div>
             <label className="text-xs font-medium text-muted-foreground block mb-2">
-              Max Change %
+              {t('screener.filters.maxChangeLabel')}
             </label>
             <input
               type="number"
-              placeholder="10"
+              placeholder={t('screener.filters.maxChangePlaceholder') as string}
               className="input-lumina w-full"
               value={filters.maxChange}
               onChange={(e) => handleFilterChange("maxChange", e.target.value)}
@@ -245,11 +247,11 @@ export default function Screener() {
           </div>
           <div>
             <label className="text-xs font-medium text-muted-foreground block mb-2">
-              Min Volume (M)
+              {t('screener.filters.minVolumeLabel')}
             </label>
             <input
               type="number"
-              placeholder="1"
+              placeholder={t('screener.filters.minVolumePlaceholder') as string}
               className="input-lumina w-full"
               value={filters.minVolume}
               onChange={(e) => handleFilterChange("minVolume", e.target.value)}
@@ -258,13 +260,13 @@ export default function Screener() {
         </div>
         <div className="flex gap-2">
           <button className="btn-lumina-primary px-6 py-2">
-            Apply Filters
+            {t('screener.filters.applyButton')}
           </button>
           <button
             onClick={resetFilters}
             className="px-6 py-2 rounded-lg bg-secondary/50 text-foreground hover:bg-secondary transition-all duration-300"
           >
-            Reset
+            {t('screener.filters.resetButton')}
           </button>
         </div>
       </div>
@@ -272,7 +274,7 @@ export default function Screener() {
       {/* Results Table */}
       <div className="card-lumina overflow-hidden">
         <div className="mb-4 text-sm text-muted-foreground">
-          Showing {filteredStocks.length} of {stocks.length} stocks
+          {t('screener.table.showingText')} {filteredStocks.length} {t('screener.table.ofText')} {stocks.length} {t('screener.table.stocksText')}
         </div>
         {filteredStocks.length > 0 ? (
           <div className="overflow-x-auto">
@@ -280,25 +282,25 @@ export default function Screener() {
               <thead>
                 <tr className="border-b border-border/30 bg-secondary/30">
                   <th className="px-4 py-3 text-left text-xs font-semibold text-foreground">
-                    Symbol
+                    {t('screener.table.symbol')}
                   </th>
                   <th className="px-4 py-3 text-right text-xs font-semibold text-foreground">
-                    Close Price
+                    {t('screener.table.closePrice')}
                   </th>
                   <th className="px-4 py-3 text-right text-xs font-semibold text-foreground">
-                    Change %
+                    {t('screener.table.changePercent')}
                   </th>
                   <th className="px-4 py-3 text-right text-xs font-semibold text-foreground">
-                    Volume
+                    {t('screener.table.volume')}
                   </th>
                   <th className="px-4 py-3 text-right text-xs font-semibold text-foreground">
-                    MA20
+                    {t('screener.table.ma20')}
                   </th>
                   <th className="px-4 py-3 text-right text-xs font-semibold text-foreground">
-                    Volatility
+                    {t('screener.table.volatility')}
                   </th>
                   <th className="px-4 py-3 text-center text-xs font-semibold text-foreground">
-                    Action
+                    {t('screener.table.action')}
                   </th>
                 </tr>
               </thead>
@@ -349,7 +351,7 @@ export default function Screener() {
                     </td>
                     <td className="px-4 py-3 text-center">
                       <button className="text-xs px-3 py-1 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors">
-                        Analyze
+                        {t('screener.table.analyzeButton')}
                       </button>
                     </td>
                   </tr>
@@ -359,7 +361,7 @@ export default function Screener() {
           </div>
         ) : (
           <div className="py-8 text-center text-muted-foreground">
-            No stocks match your filters
+            {t('screener.table.noStocks')}
           </div>
         )}
       </div>
@@ -369,7 +371,7 @@ export default function Screener() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="card-lumina">
             <p className="text-xs text-muted-foreground font-medium mb-2">
-              Avg Price Change
+              {t('screener.stats.avgPriceChange')}
             </p>
             <p
               className={cn(
@@ -391,7 +393,7 @@ export default function Screener() {
 
           <div className="card-lumina">
             <p className="text-xs text-muted-foreground font-medium mb-2">
-              Total Volume
+              {t('screener.stats.totalVolume')}
             </p>
             <p className="text-2xl font-bold text-foreground">
               {(
@@ -403,7 +405,7 @@ export default function Screener() {
 
           <div className="card-lumina">
             <p className="text-xs text-muted-foreground font-medium mb-2">
-              Avg Volatility
+              {t('screener.stats.avgVolatility')}
             </p>
             <p className="text-2xl font-bold text-foreground">
               {(
@@ -417,7 +419,7 @@ export default function Screener() {
 
           <div className="card-lumina">
             <p className="text-xs text-muted-foreground font-medium mb-2">
-              Gainers vs Losers
+              {t('screener.stats.gainersVsLosers')}
             </p>
             <p className="text-2xl font-bold text-foreground">
               {filteredStocks.filter((s) => s.price_change_pct > 0).length} /{" "}

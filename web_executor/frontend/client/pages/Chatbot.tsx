@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useI18n } from '@/hooks/useI18n';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,6 +27,7 @@ interface RAGStats {
 }
 
 export default function ChatbotPage() {
+  const { t, language } = useI18n();
   const [apiKey, setApiKey] = useState('');
   const [apiKeyValid, setApiKeyValid] = useState<boolean | null>(null);
   const [isValidating, setIsValidating] = useState(false);
@@ -142,7 +144,7 @@ export default function ChatbotPage() {
       } else {
         const errorMessage: Message = {
           role: 'assistant',
-          content: `Lỗi: ${data.error || 'Không thể xử lý câu hỏi của bạn'}`,
+          content: `${t('chatbot.chat.error')} ${data.error || t('chatbot.chat.errorMessage')}`,
           timestamp: new Date(),
         };
         setMessages((prev) => [...prev, errorMessage]);
@@ -151,7 +153,7 @@ export default function ChatbotPage() {
       console.error('Failed to send message:', error);
       const errorMessage: Message = {
         role: 'assistant',
-        content: 'Đã xảy ra lỗi khi gửi tin nhắn. Vui lòng thử lại.',
+        content: t('chatbot.chat.sendError'),
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, errorMessage]);
@@ -171,9 +173,9 @@ export default function ChatbotPage() {
     <div className="container mx-auto p-4 max-w-6xl">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-3xl font-bold mb-2">🤖 Trợ lý Tài chính AI</h1>
+        <h1 className="text-3xl font-bold mb-2">{t('chatbot.title')}</h1>
         <p className="text-gray-600">
-          Hỏi đáp về thị trường chứng khoán Việt Nam với công nghệ RAG + Gemini
+          {t('chatbot.description')}
         </p>
       </div>
 
@@ -183,9 +185,9 @@ export default function ChatbotPage() {
           <Info className="h-4 w-4" />
           <AlertDescription>
             <div className="flex flex-wrap gap-4 text-sm">
-              <span>📊 <strong>{stats.total_documents.toLocaleString()}</strong> tin tức tài chính</span>
-              <span>🧠 Model: <strong>{stats.model}</strong></span>
-              <span>📐 Vector dimension: <strong>{stats.vector_dimension}</strong></span>
+              <span>📊 <strong>{stats.total_documents.toLocaleString()}</strong> {t('chatbot.statsBanner.newsArticles')}</span>
+              <span>🧠 {t('chatbot.statsBanner.model')} <strong>{stats.model}</strong></span>
+              <span>📐 {t('chatbot.statsBanner.vectorDim')}: <strong>{stats.vector_dimension}</strong></span>
             </div>
           </AlertDescription>
         </Alert>
@@ -199,19 +201,19 @@ export default function ChatbotPage() {
               <div>
                 <h3 className="font-semibold mb-2 flex items-center gap-2">
                   <Key className="h-4 w-4" />
-                  Gemini API Key
+                  {t('chatbot.apiKeySetup.title')}
                 </h3>
                 <p className="text-sm text-gray-600 mb-3">
-                  Để sử dụng chatbot, bạn cần cung cấp API key của Gemini.
+                  {t('chatbot.apiKeySetup.description')}
                 </p>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="api-key">API Key</Label>
+                <Label htmlFor="api-key">{t('chatbot.apiKeySetup.label')}</Label>
                 <Input
                   id="api-key"
                   type="password"
-                  placeholder="AIzaSy..."
+                  placeholder={t('chatbot.apiKeySetup.placeholder') as string}
                   value={apiKey}
                   onChange={(e) => {
                     setApiKey(e.target.value);
@@ -229,10 +231,10 @@ export default function ChatbotPage() {
                 {isValidating ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Đang kiểm tra...
+                    {t('chatbot.apiKeySetup.validating')}
                   </>
                 ) : (
-                  'Xác thực API Key'
+                  t('chatbot.apiKeySetup.validate')
                 )}
               </Button>
 
@@ -240,7 +242,7 @@ export default function ChatbotPage() {
                 <Alert className="bg-green-50 border-green-200">
                   <CheckCircle className="h-4 w-4 text-green-600" />
                   <AlertDescription className="text-green-800">
-                    API key hợp lệ! Bạn có thể bắt đầu trò chuyện.
+                    {t('chatbot.apiKeySetup.valid')}
                   </AlertDescription>
                 </Alert>
               )}
@@ -249,20 +251,20 @@ export default function ChatbotPage() {
                 <Alert className="bg-red-50 border-red-200">
                   <XCircle className="h-4 w-4 text-red-600" />
                   <AlertDescription className="text-red-800">
-                    API key không hợp lệ. Vui lòng kiểm tra lại.
+                    {t('chatbot.apiKeySetup.invalid')}
                   </AlertDescription>
                 </Alert>
               )}
 
               <div className="text-xs text-gray-500 space-y-1">
-                <p>💡 <strong>Lấy API key miễn phí:</strong></p>
+                <p>💡 <strong>{t('chatbot.apiKeySetup.tipTitle')}</strong></p>
                 <a
                   href="https://makersuite.google.com/app/apikey"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-blue-600 hover:underline flex items-center gap-1"
                 >
-                  Google AI Studio
+                  {t('chatbot.apiKeySetup.getApiKey')}
                   <ExternalLink className="h-3 w-3" />
                 </a>
               </div>
@@ -277,13 +279,13 @@ export default function ChatbotPage() {
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
               {messages.length === 0 && (
                 <div className="text-center text-gray-500 mt-8">
-                  <p className="mb-4">👋 Xin chào! Tôi có thể giúp gì cho bạn?</p>
+                  <p className="mb-4">{t('chatbot.chat.welcome')}</p>
                   <div className="text-sm space-y-2">
-                    <p className="font-semibold">Câu hỏi gợi ý:</p>
+                    <p className="font-semibold">{t('chatbot.chat.suggestions')}</p>
                     <ul className="space-y-1">
-                      <li>• Tình hình thị trường chứng khoán Việt Nam hiện tại?</li>
-                      <li>• VN-Index biến động như thế nào tuần này?</li>
-                      <li>• Các ngành nào đang có triển vọng tốt?</li>
+                      {((t('chatbot.chat.suggestedQuestions') as any) || []).map((q: string, i: number) => (
+                        <li key={i}>• {q}</li>
+                      ))}
                     </ul>
                   </div>
                 </div>
@@ -303,7 +305,7 @@ export default function ChatbotPage() {
                   >
                     <p className="whitespace-pre-wrap">{message.content}</p>
                     <p className="text-xs opacity-70 mt-1">
-                      {message.timestamp.toLocaleTimeString('vi-VN')}
+                      {message.timestamp.toLocaleTimeString(language === 'vi' ? 'vi-VN' : 'en-US')}
                     </p>
 
                     {message.sources && message.sources.length > 0 && (
@@ -312,7 +314,7 @@ export default function ChatbotPage() {
                           onClick={() => setShowSources(showSources === index ? null : index)}
                           className="text-xs underline hover:no-underline"
                         >
-                          {showSources === index ? 'Ẩn' : 'Xem'} {message.sources.length} nguồn
+                          {showSources === index ? t('chatbot.chat.hideSources') : t('chatbot.chat.showSources')} {message.sources.length} {t('chatbot.chat.source')}
                         </button>
 
                         {showSources === index && (
@@ -320,7 +322,7 @@ export default function ChatbotPage() {
                             {message.sources.map((source, i) => (
                               <div key={i} className="text-xs bg-white/50 p-2 rounded">
                                 <Badge variant="outline" className="mb-1">
-                                  Nguồn {i + 1} ({(source.score * 100).toFixed(1)}%)
+                                  {t('chatbot.chat.source')} {i + 1} ({(source.score * 100).toFixed(1)}%)
                                 </Badge>
                                 <p className="line-clamp-3">{source.text}</p>
                               </div>
@@ -350,8 +352,8 @@ export default function ChatbotPage() {
                 <Input
                   placeholder={
                     apiKeyValid
-                      ? 'Nhập câu hỏi của bạn...'
-                      : 'Vui lòng xác thực API key trước'
+                      ? (t('chatbot.chat.placeholder') as string)
+                      : (t('chatbot.chat.disabledPlaceholder') as string)
                   }
                   value={inputMessage}
                   onChange={(e) => setInputMessage(e.target.value)}
@@ -371,7 +373,7 @@ export default function ChatbotPage() {
                 </Button>
               </div>
               <p className="text-xs text-gray-500 mt-2">
-                💡 Nhấn Enter để gửi, Shift+Enter để xuống dòng
+                {t('chatbot.chat.enterToSend')}
               </p>
             </div>
           </Card>

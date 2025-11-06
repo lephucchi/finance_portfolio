@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Send, X, Eye, Minimize2, Maximize2, Key, CheckCircle, XCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/hooks/useI18n";
 
 interface Message {
   id: string;
@@ -23,6 +24,7 @@ const DISCOVERIES = [
 ];
 
 export default function ChatPanel() {
+  const { t, language } = useI18n();
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
@@ -30,7 +32,9 @@ export default function ChatPanel() {
       id: "1",
       role: "oracle",
       content:
-        "✨ Xin chào! Tôi là trợ lý tài chính AI. Tôi có thể giúp bạn phân tích thị trường Việt Nam. Bạn cần tư vấn gì?",
+        language === 'vi'
+          ? t('chatPanel.initialMessage')
+          : "✨ Hello! I am an AI financial assistant. I can help you analyze the Vietnamese market. What would you like to know?",
       timestamp: new Date(),
     },
   ]);
@@ -129,7 +133,7 @@ export default function ChatPanel() {
           const oracleMessage: Message = {
             id: (Date.now() + 1).toString(),
             role: "oracle",
-            content: data.answer || "Đang xử lý...",
+            content: data.answer || t('chatPanel.errorMessage'),
             timestamp: new Date(data.timestamp),
             sources: data.sources,
           };
@@ -143,7 +147,7 @@ export default function ChatPanel() {
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: "oracle",
-        content: "Xin lỗi, có lỗi xảy ra. Vui lòng thử lại.",
+        content: t('chatPanel.errorMessage'),
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, errorMessage]);
@@ -174,10 +178,10 @@ export default function ChatPanel() {
         >
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b border-border/20">
-            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2">
               <Eye className="w-5 h-5 text-primary" />
               <h3 className="font-semibold text-sm text-foreground">
-                Trợ lý AI
+                {t('chatPanel.title')}
               </h3>
               {apiKeyValid === true && (
                 <CheckCircle className="w-3 h-3 text-green-600" />
@@ -190,7 +194,7 @@ export default function ChatPanel() {
               <button
                 onClick={() => setShowKeyInput(!showKeyInput)}
                 className="p-1 hover:bg-secondary/50 rounded-md transition-colors"
-                title="API Settings"
+                title={t('chatPanel.apiSettingsTitle')}
               >
                 <Key className="w-4 h-4" />
               </button>
@@ -220,7 +224,7 @@ export default function ChatPanel() {
                 <div className="p-3 border-b border-border/20 bg-secondary/10 space-y-2">
                   <div className="text-xs text-muted-foreground">
                     <a href="https://makersuite.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-                      Get free API key
+                      {t('chatPanel.getApiKey')}
                     </a>
                   </div>
                   <div className="flex gap-2">
@@ -228,14 +232,14 @@ export default function ChatPanel() {
                       type="password"
                       value={apiKey}
                       onChange={(e) => setApiKey(e.target.value)}
-                      placeholder="AIzaSy..."
+                      placeholder={t('chatPanel.apiKeyPlaceholder') as string}
                       className="flex-1 px-2 py-1 bg-background/50 rounded text-xs outline-none focus:ring-1 focus:ring-primary/50"
                     />
                     <button
                       onClick={() => validateApiKey()}
                       className="px-2 py-1 bg-primary text-primary-foreground rounded text-xs"
                     >
-                      Save
+                      {t('chatPanel.saveButton')}
                     </button>
                   </div>
                 </div>
@@ -294,10 +298,10 @@ export default function ChatPanel() {
               {messages.length === 1 && !isLoading && apiKeyValid === true && (
                 <div className="px-4 py-3 border-t border-border/20 bg-secondary/10">
                   <p className="text-xs text-muted-foreground mb-2">
-                    Câu hỏi gợi ý:
+                    {t('chatPanel.suggestionsLabel')}
                   </p>
                   <div className="space-y-2">
-                    {DISCOVERIES.map((disc, idx) => (
+                    {(t('chatPanel.suggestedQuestions') as any || []).map((disc: string, idx: number) => (
                       <button
                         key={idx}
                         onClick={() => handleSendMessage(disc)}
@@ -317,7 +321,7 @@ export default function ChatPanel() {
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyPress={(e) => e.key === "Enter" && !e.shiftKey && handleSendMessage()}
-                  placeholder={apiKeyValid === true ? "Nhập câu hỏi..." : "⚠️ Cấu hình API key"}
+                  placeholder={apiKeyValid === true ? (t('chatPanel.inputPlaceholder') as string) : (t('chatPanel.inputDisabledPlaceholder') as string)}
                   className="flex-1 px-3 py-2 bg-secondary/30 rounded-lg text-sm outline-none focus:ring-1 focus:ring-primary/50 transition-all"
                   disabled={isLoading || apiKeyValid !== true}
                 />
