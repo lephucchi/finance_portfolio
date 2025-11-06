@@ -1,19 +1,18 @@
 import { Zap, Download, Share2, Plus, Construction, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/hooks/useI18n";
 
-function DevelopmentWarning() {
+function DevelopmentWarning({ title, message }: { title?: string; message?: string }) {
   return (
     <div className="card-lumina border-l-4 border-yellow-500 bg-yellow-50">
       <div className="flex gap-3">
         <Construction className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
         <div>
           <h3 className="font-semibold text-yellow-900 flex items-center gap-2">
-            🚧 Under Development - Demo Data Only
+            {title || "🚧 Under Development - Demo Data Only"}
           </h3>
           <p className="text-sm text-yellow-800 mt-1">
-            This Reports feature is currently under development. All reports, analysis, 
-            and AI-generated insights shown below are simulated for demonstration purposes 
-            and do not reflect actual market analysis.
+            {message || "This Reports feature is currently under development. All reports, analysis, and AI-generated insights shown below are simulated for demonstration purposes and do not reflect actual market analysis."}
           </p>
         </div>
       </div>
@@ -46,29 +45,34 @@ const REPORTS = [
 ];
 
 export default function Reports() {
+  const { t, language } = useI18n();
+  
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="card-lumina flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-3">
-            <h1 className="text-3xl font-bold text-foreground">Reports</h1>
+            <h1 className="text-3xl font-bold text-foreground">{t('reports.title')}</h1>
             <span className="px-3 py-1 bg-yellow-100 text-yellow-800 text-xs font-semibold rounded-full border border-yellow-300">
-              🚧 DEMO
+              {t('reports.demoTag')}
             </span>
           </div>
           <p className="text-sm text-muted-foreground mt-2">
-            AI-generated market analysis reports (Demo Version)
+            {t('reports.subtitle')}
           </p>
         </div>
         <button className="btn-lumina-primary px-4 py-2 flex items-center gap-2" disabled>
           <Plus className="w-4 h-4" />
-          Generate
+          {t('reports.generateButton')}
         </button>
       </div>
 
       {/* Development Warning */}
-      <DevelopmentWarning />
+      <DevelopmentWarning 
+        title={t('reports.developmentWarning')}
+        message={t('reports.developmentWarningText')}
+      />
 
       {/* Generation Status */}
       <div className="card-lumina border-l-4 border-primary">
@@ -76,10 +80,10 @@ export default function Reports() {
           <Zap className="w-5 h-5 text-primary flex-shrink-0 mt-1" />
           <div className="flex-1">
             <h3 className="font-semibold text-primary mb-2">
-              Analysis in Progress
+              {t('reports.analysisInProgress')}
             </h3>
             <p className="text-sm text-foreground mb-3">
-              Processing market data and generating insights...
+              {t('reports.processingMessage')}
             </p>
             <div className="w-full h-2 bg-secondary rounded-full overflow-hidden">
               <div
@@ -88,7 +92,7 @@ export default function Reports() {
               />
             </div>
             <p className="text-xs text-muted-foreground mt-2">
-              68% • ETA: 2 minutes
+              68% • {t('reports.eta')} 2 {t('reports.minutes')}
             </p>
           </div>
         </div>
@@ -104,7 +108,7 @@ export default function Reports() {
                   {report.title}
                 </h3>
                 <div className="flex flex-wrap items-center gap-3 mt-2 text-xs text-muted-foreground">
-                  <span>{new Date(report.created).toLocaleDateString()}</span>
+                  <span>{t('reports.created')}: {new Date(report.created).toLocaleDateString(language === 'vi' ? 'vi-VN' : 'en-US')}</span>
                   <span>•</span>
                   <span
                     className={cn(
@@ -115,7 +119,7 @@ export default function Reports() {
                     {report.status}
                   </span>
                   <span>•</span>
-                  <span>Confidence: {report.confidence}%</span>
+                  <span>{t('reports.confidence')} {report.confidence}%</span>
                 </div>
               </div>
 
@@ -123,23 +127,23 @@ export default function Reports() {
                 <button 
                   className="p-2 rounded-lg hover:bg-secondary/50 transition-colors"
                   disabled
-                  title="Demo feature - not functional"
+                  title={t('reports.demoFeatureNotFunctional')}
                 >
                   <Download className="w-4 h-4 text-muted-foreground" />
                 </button>
                 <button 
                   className="p-2 rounded-lg hover:bg-secondary/50 transition-colors"
                   disabled
-                  title="Demo feature - not functional"
+                  title={t('reports.demoFeatureNotFunctional')}
                 >
                   <Share2 className="w-4 h-4 text-muted-foreground" />
                 </button>
                 <button 
                   className="btn-lumina px-4 py-2"
                   disabled
-                  title="Demo feature - not functional"
+                  title={t('reports.demoFeatureNotFunctional')}
                 >
-                  View
+                  {t('reports.view')}
                 </button>
               </div>
             </div>
@@ -153,18 +157,28 @@ export default function Reports() {
           <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
           <div>
             <h3 className="font-semibold text-yellow-900 mb-2">
-              📊 Demo Data Notice
+              {t('reports.disclaimer.title')}
             </h3>
             <p className="text-sm text-yellow-800 mb-2">
-              <strong>Important:</strong> This Reports feature is currently in development. 
-              All reports, confidence scores, and AI-generated insights displayed above are 
-              simulated data for demonstration purposes only.
+              <strong>{t('reports.disclaimer.important')}</strong> {t('reports.disclaimer.message')}
             </p>
             <ul className="text-xs text-yellow-700 space-y-1 list-disc list-inside">
-              <li>No actual AI analysis is being performed</li>
-              <li>Reports cannot be downloaded or shared</li>
-              <li>Confidence scores are randomly generated</li>
-              <li>Do not use this information for investment decisions</li>
+              {(language === 'vi'
+                ? [
+                    'Không có phân tích AI thực tế nào được thực hiện',
+                    'Báo cáo không thể tải xuống hoặc chia sẻ',
+                    'Điểm độ tin cây được tạo ngẫu nhiên',
+                    'Không sử dụng thông tin này để quyết định đầu tư',
+                  ]
+                : [
+                    'No actual AI analysis is being performed',
+                    'Reports cannot be downloaded or shared',
+                    'Confidence scores are randomly generated',
+                    'Do not use this information for investment decisions',
+                  ]
+              ).map((point, index) => (
+                <li key={index}>{point}</li>
+              ))}
             </ul>
           </div>
         </div>

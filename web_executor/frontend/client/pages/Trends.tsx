@@ -9,6 +9,7 @@ import {
   Construction,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/hooks/useI18n";
 
 // Mock data for demo - Vietnam stock market sectors
 const MOCK_SECTOR_DATA = [
@@ -86,13 +87,13 @@ function LoadingSpinner() {
   );
 }
 
-function ErrorAlert({ message }: { message: string }) {
+function ErrorAlert({ message, title }: { message: string; title?: string }) {
   return (
     <div className="card-lumina border-l-4 border-accent bg-accent/10">
       <div className="flex gap-3">
         <AlertCircle className="w-5 h-5 text-accent flex-shrink-0 mt-0.5" />
         <div>
-          <h3 className="font-semibold text-foreground">Error Loading Data</h3>
+          <h3 className="font-semibold text-foreground">{title || "Error Loading Data"}</h3>
           <p className="text-sm text-muted-foreground mt-1">{message}</p>
         </div>
       </div>
@@ -100,19 +101,17 @@ function ErrorAlert({ message }: { message: string }) {
   );
 }
 
-function DevelopmentWarning() {
+function DevelopmentWarning({ title, message }: { title?: string; message?: string }) {
   return (
     <div className="card-lumina border-l-4 border-yellow-500 bg-yellow-50">
       <div className="flex gap-3">
         <Construction className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
         <div>
           <h3 className="font-semibold text-yellow-900 flex items-center gap-2">
-            🚧 Under Development - Demo Data Only
+            {title || "🚧 Under Development - Demo Data Only"}
           </h3>
           <p className="text-sm text-yellow-800 mt-1">
-            This Forecasts feature is currently under development. All sector performance data, 
-            predictions, and analytics shown below are simulated for demonstration purposes and 
-            do not reflect actual market conditions.
+            {message || "This Forecasts feature is currently under development. All sector performance data, predictions, and analytics shown below are simulated for demonstration purposes and do not reflect actual market conditions."}
           </p>
         </div>
       </div>
@@ -120,7 +119,7 @@ function DevelopmentWarning() {
   );
 }
 
-function SectorCard({ sector }: { sector: typeof MOCK_SECTOR_DATA[0] }) {
+function SectorCard({ sector, t }: { sector: typeof MOCK_SECTOR_DATA[0]; t: (key: string) => string }) {
   const isPositive = sector.avg_change_pct >= 0;
   const Icon = isPositive ? TrendingUp : TrendingDown;
 
@@ -147,13 +146,13 @@ function SectorCard({ sector }: { sector: typeof MOCK_SECTOR_DATA[0] }) {
 
       <div className="space-y-2 mb-4">
         <p className="text-xs text-muted-foreground">
-          {sector.stock_count} stocks • Vol:{" "}
+          {sector.stock_count} {t('trends.sectorCard.stocks')}{" "}
           {(sector.total_volume / 1000000000).toFixed(1)}B
         </p>
 
         {sector.top_gainers.length > 0 && (
           <div>
-            <p className="text-xs font-medium text-primary mb-1">Top Gainers</p>
+            <p className="text-xs font-medium text-primary mb-1">{t('trends.sectorCard.topGainers')}</p>
             <div className="flex gap-1 flex-wrap">
               {sector.top_gainers.slice(0, 3).map((symbol) => (
                 <span
@@ -169,7 +168,7 @@ function SectorCard({ sector }: { sector: typeof MOCK_SECTOR_DATA[0] }) {
 
         {sector.top_losers.length > 0 && (
           <div>
-            <p className="text-xs font-medium text-accent mb-1">Top Losers</p>
+            <p className="text-xs font-medium text-accent mb-1">{t('trends.sectorCard.topLosers')}</p>
             <div className="flex gap-1 flex-wrap">
               {sector.top_losers.slice(0, 3).map((symbol) => (
                 <span
@@ -188,6 +187,7 @@ function SectorCard({ sector }: { sector: typeof MOCK_SECTOR_DATA[0] }) {
 }
 
 export default function Trends() {
+  const { t, language } = useI18n();
   const [sectors, setSectors] = useState<typeof MOCK_SECTOR_DATA>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -231,13 +231,13 @@ export default function Trends() {
           <div className="flex items-center justify-between">
             <div>
               <div className="flex items-center gap-3">
-                <h1 className="text-3xl font-bold text-foreground">Forecasts</h1>
+                <h1 className="text-3xl font-bold text-foreground">{t('trends.title')}</h1>
                 <span className="px-3 py-1 bg-yellow-100 text-yellow-800 text-xs font-semibold rounded-full border border-yellow-300">
-                  🚧 DEMO
+                  {t('trends.demoTag')}
                 </span>
               </div>
               <p className="text-sm text-muted-foreground mt-2">
-                AI-powered trend analysis and sector predictions (Demo Version)
+                {t('trends.subtitleDemo')}
               </p>
             </div>
             <button
@@ -250,7 +250,7 @@ export default function Trends() {
               )}
             >
               <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
-              Refresh
+              {t('trends.refreshButton')}
             </button>
           </div>
         </div>
@@ -266,13 +266,13 @@ export default function Trends() {
           <div className="flex items-center justify-between">
             <div>
               <div className="flex items-center gap-3">
-                <h1 className="text-3xl font-bold text-foreground">Forecasts</h1>
+                <h1 className="text-3xl font-bold text-foreground">{t('trends.title')}</h1>
                 <span className="px-3 py-1 bg-yellow-100 text-yellow-800 text-xs font-semibold rounded-full border border-yellow-300">
-                  🚧 DEMO
+                  {t('trends.demoTag')}
                 </span>
               </div>
               <p className="text-sm text-muted-foreground mt-2">
-                AI-powered trend analysis and sector predictions (Demo Version)
+                {t('trends.subtitleDemo')}
               </p>
             </div>
             <button
@@ -285,11 +285,11 @@ export default function Trends() {
               )}
             >
               <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
-              Refresh
+              {t('trends.refreshButton')}
             </button>
           </div>
         </div>
-        <ErrorAlert message={error} />
+        <ErrorAlert message={error} title={t('trends.title')} />
       </div>
     );
   }
@@ -309,13 +309,13 @@ export default function Trends() {
         <div className="flex items-center justify-between">
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-bold text-foreground">Forecasts</h1>
+              <h1 className="text-3xl font-bold text-foreground">{t('trends.title')}</h1>
               <span className="px-3 py-1 bg-yellow-100 text-yellow-800 text-xs font-semibold rounded-full border border-yellow-300">
-                🚧 DEMO
+                {t('trends.demoTag')}
               </span>
             </div>
             <p className="text-sm text-muted-foreground mt-2">
-              AI-powered trend analysis and sector predictions (Demo Version)
+              {t('trends.subtitleDemo')}
             </p>
           </div>
           <button
@@ -328,19 +328,22 @@ export default function Trends() {
             )}
           >
             <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
-            Refresh
+            {t('trends.refreshButton')}
           </button>
         </div>
       </div>
 
       {/* Development Warning */}
-      <DevelopmentWarning />
+      <DevelopmentWarning 
+        title={t('trends.developmentWarning')}
+        message={t('trends.developmentWarningText')}
+      />
 
       {/* Summary Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="card-lumina">
           <p className="text-xs text-muted-foreground font-medium mb-2">
-            Market Avg Change
+            {t('trends.stats.marketAvgChange')}
           </p>
           <p
             className={cn(
@@ -352,14 +355,14 @@ export default function Trends() {
             {avgChange.toFixed(2)}%
           </p>
           <p className="text-xs text-muted-foreground mt-2">
-            {gainers.length} gainers • {losers.length} losers
+            {gainers.length} {t('trends.stats.gainersLosers')}{losers.length} losers
           </p>
         </div>
 
         {topSector && (
           <div className="card-lumina border-l-4 border-primary">
             <p className="text-xs text-muted-foreground font-medium mb-2">
-              Best Performing
+              {t('trends.stats.bestPerforming')}
             </p>
             <p className="text-2xl font-bold text-primary">
               {topSector.sector}
@@ -373,7 +376,7 @@ export default function Trends() {
         {worstSector && (
           <div className="card-lumina border-l-4 border-accent">
             <p className="text-xs text-muted-foreground font-medium mb-2">
-              Worst Performing
+              {t('trends.stats.worstPerforming')}
             </p>
             <p className="text-2xl font-bold text-accent">
               {worstSector.sector}
@@ -389,12 +392,12 @@ export default function Trends() {
       {sectors.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {sectors.map((sector) => (
-            <SectorCard key={sector.sector} sector={sector} />
+            <SectorCard key={sector.sector} sector={sector} t={t} />
           ))}
         </div>
       ) : (
         <div className="card-lumina py-8 text-center text-muted-foreground">
-          No sector data available
+          {t('trends.sectorCard.noData')}
         </div>
       )}
 
@@ -402,52 +405,50 @@ export default function Trends() {
       <div className="card-lumina">
         <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
           <Award className="w-5 h-5 text-primary" />
-          Market Outlook
+          {t('trends.marketOutlook.title')}
         </h2>
         <div className="space-y-4">
           <div>
-            <p className="font-medium text-foreground mb-2">Sector Dynamics</p>
+            <p className="font-medium text-foreground mb-2">{t('trends.marketOutlook.sectorDynamics')}</p>
             <p className="text-sm text-muted-foreground leading-relaxed">
               {gainers.length > losers.length
-                ? `Market showing positive momentum with ${gainers.length} sectors in green. `
-                : `Market showing mixed signals with ${losers.length} sectors declining. `}
+                ? `${t('trends.marketOutlook.positiveMessage')} ${gainers.length} ${t('trends.marketOutlook.sectorsInGreen')} `
+                : `${t('trends.marketOutlook.mixedMessage')} ${losers.length} ${t('trends.marketOutlook.sectorsDeclining')} `}
               {topSector &&
-                `${topSector.sector} sector leading with ${topSector.avg_change_pct.toFixed(2)}% change, `}
+                `${topSector.sector} ${t('trends.marketOutlook.sectorLeading')} ${topSector.avg_change_pct.toFixed(2)}% ${t('trends.marketOutlook.change')}, `}
               {worstSector &&
-                `while ${worstSector.sector} lags with ${worstSector.avg_change_pct.toFixed(2)}% change.`}
+                `${t('trends.marketOutlook.sectorLagging')} ${worstSector.sector} ${t('trends.marketOutlook.change')} ${worstSector.avg_change_pct.toFixed(2)}%.`}
             </p>
           </div>
 
           <div>
-            <p className="font-medium text-foreground mb-2">Key Insights</p>
+            <p className="font-medium text-foreground mb-2">{t('trends.marketOutlook.keyInsights')}</p>
             <ul className="text-sm text-muted-foreground space-y-1">
               <li>
-                • {sectors.length} sectors analyzed with avg change of{" "}
+                • {sectors.length} {t('trends.marketOutlook.sectorAnalyzed')}{" "}
                 {avgChange.toFixed(2)}%
               </li>
               <li>
-                • Total trading volume across sectors:{" "}
+                • {t('trends.marketOutlook.totalVolume')}{" "}
                 {(
                   sectors.reduce((sum, s) => sum + s.total_volume, 0) /
                   1000000000
-                ).toFixed(1)}
-                B shares
+                ).toFixed(1)}{" "}
+                {t('trends.marketOutlook.sharesLabel')}
               </li>
               <li>
-                • Sector momentum:{" "}
-                {gainers.length > losers.length ? "Bullish" : "Bearish"} trend
+                • {t('trends.marketOutlook.sectorMomentum')}{" "}
+                {gainers.length > losers.length ? t('trends.marketOutlook.bullishTrend') : t('trends.marketOutlook.bearishTrend')}
               </li>
             </ul>
           </div>
 
           <div>
             <p className="font-medium text-foreground mb-2">
-              Investment Strategy
+              {t('trends.marketOutlook.investmentStrategy')}
             </p>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Focus on sectors with positive momentum and strong gainers.
-              Monitor declining sectors for potential reversal setups. Use
-              volume and breadth to confirm trend strength across the market.
+              {t('trends.marketOutlook.strategyText')}
             </p>
           </div>
         </div>
@@ -456,26 +457,26 @@ export default function Trends() {
       {/* Detailed Performance Table */}
       <div className="card-lumina overflow-hidden">
         <h2 className="text-lg font-semibold text-foreground mb-4">
-          Detailed Performance
+          {t('trends.table.title')}
         </h2>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="border-b border-border/30 bg-secondary/30">
                 <th className="px-4 py-3 text-left text-xs font-semibold text-foreground">
-                  Sector
+                  {t('trends.table.sector')}
                 </th>
                 <th className="px-4 py-3 text-right text-xs font-semibold text-foreground">
-                  Change %
+                  {t('trends.table.changePercent')}
                 </th>
                 <th className="px-4 py-3 text-right text-xs font-semibold text-foreground">
-                  Stocks
+                  {t('trends.table.stocks')}
                 </th>
                 <th className="px-4 py-3 text-right text-xs font-semibold text-foreground">
-                  Volume
+                  {t('trends.table.volume')}
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-foreground">
-                  Top Gainers
+                  {t('trends.table.topGainers')}
                 </th>
               </tr>
             </thead>
@@ -530,18 +531,28 @@ export default function Trends() {
           <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
           <div>
             <h3 className="font-semibold text-yellow-900 mb-2">
-              📊 Demo Data Notice
+              {t('trends.disclaimer.title')}
             </h3>
             <p className="text-sm text-yellow-800 mb-2">
-              <strong>Important:</strong> This Forecasts feature is currently in development. 
-              All sector performance data, trends, and analytics displayed above are simulated data 
-              for demonstration purposes only.
+              <strong>{t('trends.disclaimer.important')}</strong> {t('trends.disclaimer.message')}
             </p>
             <ul className="text-xs text-yellow-700 space-y-1 list-disc list-inside">
-              <li>Sector performance metrics are randomly generated</li>
-              <li>Stock symbols and volumes do not reflect real market data</li>
-              <li>Predictions and trends are for UI demonstration only</li>
-              <li>Do not use this information for investment decisions</li>
+              {(language === 'vi'
+                ? [
+                    'Thông số hiệu suất ngành được tạo ngẫu nhiên',
+                    'Các ký hiệu cổ phiếu và khối lượng không phản ánh dữ liệu thị trường thực tế',
+                    'Dự đoán và xu hướng chỉ cho mục đích trình diễn giao diện',
+                    'Không sử dụng thông tin này để quyết định đầu tư',
+                  ]
+                : [
+                    'Sector performance metrics are randomly generated',
+                    'Stock symbols and volumes do not reflect real market data',
+                    'Predictions and trends are for UI demonstration only',
+                    'Do not use this information for investment decisions',
+                  ]
+              ).map((point, index) => (
+                <li key={index}>{point}</li>
+              ))}
             </ul>
           </div>
         </div>

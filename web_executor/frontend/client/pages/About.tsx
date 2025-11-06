@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { Target, TrendingUp, Zap, Users, Code, Database, Cloud, Brain, Layers, MessageSquare, GitBranch, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/hooks/useI18n";
 
 type Section = "overview" | "lakehouse" | "rag" | "airflow";
 
 export default function About() {
   const [activeSection, setActiveSection] = useState<Section>("overview");
+  const { t } = useI18n();
 
   return (
     <div className="space-y-6">
@@ -20,21 +22,19 @@ export default function About() {
             />
           </div>
           <p className="text-lg text-primary font-semibold mb-3 italic">
-            "The AI Shield That Illuminates Your Data"
+            "{t('about.tagline')}"
           </p>
           <p className="text-base text-muted-foreground mb-4 max-w-3xl mx-auto px-4">
-            Named after the divine shield of Zeus and Athena (AEGIS) combined with the light of wisdom (LUMINA) – 
-            An AI system that protects and illuminates all your financial data, 
-            like the watchful eye of Athena upon her legendary shield.
+            {t('about.description')}
           </p>
           <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
             <span className="px-3 py-1 bg-primary/20 text-primary rounded-full font-medium">
-              Version 1.0
+              {t('about.version')}
             </span>
             <span>•</span>
-            <span>Production Ready</span>
+            <span>{t('about.productionReady')}</span>
             <span>•</span>
-            <span>November 2025</span>
+            <span>{t('about.november2025')}</span>
           </div>
         </div>
       </div>
@@ -52,7 +52,7 @@ export default function About() {
             )}
           >
             <Target className="w-5 h-5" />
-            <span className="font-medium">Overview</span>
+            <span className="font-medium">{t('about.overview')}</span>
           </button>
           <button
             onClick={() => setActiveSection("lakehouse")}
@@ -64,7 +64,7 @@ export default function About() {
             )}
           >
             <Layers className="w-5 h-5" />
-            <span className="font-medium">Lakehouse</span>
+            <span className="font-medium">{t('about.lakehouse')}</span>
           </button>
           <button
             onClick={() => setActiveSection("rag")}
@@ -76,7 +76,7 @@ export default function About() {
             )}
           >
             <MessageSquare className="w-5 h-5" />
-            <span className="font-medium">RAG Chatbot</span>
+            <span className="font-medium">{t('about.ragChatbot')}</span>
           </button>
           <button
             onClick={() => setActiveSection("airflow")}
@@ -88,7 +88,7 @@ export default function About() {
             )}
           >
             <GitBranch className="w-5 h-5" />
-            <span className="font-medium">Airflow ETL</span>
+            <span className="font-medium">{t('about.airflowEtl')}</span>
           </button>
         </div>
       </div>
@@ -102,27 +102,24 @@ export default function About() {
           <Target className="w-8 h-8 text-primary flex-shrink-0 mt-1" />
           <div>
             <h2 className="text-2xl font-bold text-foreground mb-3">
-              Mission Statement
+              {t('about.missionStatement')}
             </h2>
             <div className="prose prose-sm max-w-none">
               <p className="text-foreground leading-relaxed mb-4">
-                We build a <strong>comprehensive financial data analytics platform</strong> that 
-                enables extraction of insights from Vietnam stock market data, news, and economic 
-                indicators using <strong>modern Lakehouse architecture</strong> combined with 
-                <strong> AI/ML capabilities</strong>.
+                {t('about.missionText')}
               </p>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
                 <div className="p-4 bg-primary/5 rounded-lg">
                   <div className="text-3xl font-bold text-primary mb-2">87-94%</div>
-                  <div className="text-sm text-muted-foreground">Cost savings vs traditional RDS</div>
+                  <div className="text-sm text-muted-foreground">{t('about.costSavings')}</div>
                 </div>
                 <div className="p-4 bg-primary/5 rounded-lg">
                   <div className="text-3xl font-bold text-primary mb-2">85-90%</div>
-                  <div className="text-sm text-muted-foreground">Faster query speed</div>
+                  <div className="text-sm text-muted-foreground">{t('about.fasterQuerySpeed')}</div>
                 </div>
                 <div className="p-4 bg-primary/5 rounded-lg">
                   <div className="text-3xl font-bold text-primary mb-2">99.8%</div>
-                  <div className="text-sm text-muted-foreground">System uptime</div>
+                  <div className="text-sm text-muted-foreground">{t('about.systemUptime')}</div>
                 </div>
               </div>
             </div>
@@ -136,7 +133,7 @@ export default function About() {
           <TrendingUp className="w-8 h-8 text-primary flex-shrink-0 mt-1" />
           <div>
             <h2 className="text-2xl font-bold text-foreground mb-3">
-              Project Overview
+              {t('about.projectOverview')}
             </h2>
           </div>
         </div>
@@ -146,7 +143,7 @@ export default function About() {
           <div className="space-y-4">
             <div>
               <h3 className="text-lg font-semibold text-foreground mb-2">
-                Key Solutions
+                {t('about.keySolutions')}
               </h3>
               <ul className="space-y-2">
                 {[
@@ -167,23 +164,23 @@ export default function About() {
 
             <div>
               <h3 className="text-lg font-semibold text-foreground mb-2">
-                Data Processed
+                {t('about.dataProcessed')}
               </h3>
               <div className="grid grid-cols-2 gap-3">
                 <div className="p-3 bg-secondary/30 rounded-lg">
-                  <div className="text-sm text-muted-foreground mb-1">Stocks</div>
+                  <div className="text-sm text-muted-foreground mb-1">{t('about.stocks')}</div>
                   <div className="text-lg font-bold text-foreground">10,950+</div>
                 </div>
                 <div className="p-3 bg-secondary/30 rounded-lg">
-                  <div className="text-sm text-muted-foreground mb-1">News</div>
+                  <div className="text-sm text-muted-foreground mb-1">{t('about.news')}</div>
                   <div className="text-lg font-bold text-foreground">12,027</div>
                 </div>
                 <div className="p-3 bg-secondary/30 rounded-lg">
-                  <div className="text-sm text-muted-foreground mb-1">Indicators</div>
+                  <div className="text-sm text-muted-foreground mb-1">{t('about.indicators')}</div>
                   <div className="text-lg font-bold text-foreground">18,250</div>
                 </div>
                 <div className="p-3 bg-secondary/30 rounded-lg">
-                  <div className="text-sm text-muted-foreground mb-1">Symbols</div>
+                  <div className="text-sm text-muted-foreground mb-1">{t('about.symbols')}</div>
                   <div className="text-lg font-bold text-foreground">30</div>
                 </div>
               </div>
@@ -194,21 +191,21 @@ export default function About() {
           <div className="space-y-4">
             <div>
               <h3 className="text-lg font-semibold text-foreground mb-2">
-                System Performance
+                {t('about.systemPerformance')}
               </h3>
               <div className="space-y-3">
                 {[
-                  { label: "Query Latency (P50)", target: "< 2s", actual: "0.8s", status: "✅" },
-                  { label: "Query Latency (P99)", target: "< 5s", actual: "2.1s", status: "✅" },
-                  { label: "Data Freshness", target: "< 30min", actual: "5-15min", status: "✅" },
-                  { label: "Vector Search", target: "< 50ms", actual: "12ms", status: "✅" },
-                  { label: "System Uptime", target: "> 99%", actual: "99.8%", status: "✅" }
+                  { label: t('about.queryLatencyP50'), target: "< 2s", actual: "0.8s", status: "✅" },
+                  { label: t('about.queryLatencyP99'), target: "< 5s", actual: "2.1s", status: "✅" },
+                  { label: t('about.dataFreshness'), target: "< 30min", actual: "5-15min", status: "✅" },
+                  { label: t('about.vectorSearchLatency'), target: "< 50ms", actual: "12ms", status: "✅" },
+                  { label: t('about.systemUptime'), target: "> 99%", actual: "99.8%", status: "✅" }
                 ].map((metric, i) => (
                   <div key={i} className="flex items-center justify-between p-2 bg-secondary/20 rounded">
                     <span className="text-sm text-muted-foreground">{metric.label}</span>
                     <div className="flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground">{metric.target}</span>
-                      <span className="text-sm font-semibold text-primary">{metric.actual}</span>
+                      <span className="text-xs text-muted-foreground">{t('about.target')}: {metric.target}</span>
+                      <span className="text-sm font-semibold text-primary">{t('about.actual')}: {metric.actual}</span>
                       <span>{metric.status}</span>
                     </div>
                   </div>
@@ -225,7 +222,7 @@ export default function About() {
           <Code className="w-8 h-8 text-primary flex-shrink-0 mt-1" />
           <div>
             <h2 className="text-2xl font-bold text-foreground mb-3">
-              Technology Stack
+              {t('about.technologyStack')}
             </h2>
           </div>
         </div>
@@ -234,7 +231,7 @@ export default function About() {
           {/* Cloud Infrastructure */}
           <div className="p-4 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 rounded-lg">
             <Cloud className="w-6 h-6 text-blue-600 mb-3" />
-            <h3 className="font-semibold text-foreground mb-2">Cloud Infrastructure</h3>
+            <h3 className="font-semibold text-foreground mb-2">{t('about.cloudInfrastructure')}</h3>
             <ul className="space-y-1 text-sm text-muted-foreground">
               <li>• AWS S3</li>
               <li>• AWS Glue</li>
@@ -246,7 +243,7 @@ export default function About() {
           {/* Data Processing */}
           <div className="p-4 bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 rounded-lg">
             <Database className="w-6 h-6 text-green-600 mb-3" />
-            <h3 className="font-semibold text-foreground mb-2">Data Processing</h3>
+            <h3 className="font-semibold text-foreground mb-2">{t('about.dataProcessing')}</h3>
             <ul className="space-y-1 text-sm text-muted-foreground">
               <li>• Apache Airflow</li>
               <li>• Apache Spark</li>
@@ -258,7 +255,7 @@ export default function About() {
           {/* Backend & API */}
           <div className="p-4 bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 rounded-lg">
             <Zap className="w-6 h-6 text-purple-600 mb-3" />
-            <h3 className="font-semibold text-foreground mb-2">Backend & API</h3>
+            <h3 className="font-semibold text-foreground mb-2">{t('about.backendApi')}</h3>
             <ul className="space-y-1 text-sm text-muted-foreground">
               <li>• FastAPI</li>
               <li>• Python Async</li>
@@ -270,7 +267,7 @@ export default function About() {
           {/* AI/ML */}
           <div className="p-4 bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-orange-800/20 rounded-lg">
             <Brain className="w-6 h-6 text-orange-600 mb-3" />
-            <h3 className="font-semibold text-foreground mb-2">AI/ML & NLP</h3>
+            <h3 className="font-semibold text-foreground mb-2">{t('about.aiMlNlp')}</h3>
             <ul className="space-y-1 text-sm text-muted-foreground">
               <li>• FAISS Vector DB</li>
               <li>• Vietnamese SBERT</li>
@@ -282,7 +279,7 @@ export default function About() {
           {/* Frontend */}
           <div className="p-4 bg-gradient-to-br from-indigo-50 to-indigo-100 dark:from-indigo-900/20 dark:to-indigo-800/20 rounded-lg">
             <Code className="w-6 h-6 text-indigo-600 mb-3" />
-            <h3 className="font-semibold text-foreground mb-2">Frontend Stack</h3>
+            <h3 className="font-semibold text-foreground mb-2">{t('about.frontendStack')}</h3>
             <ul className="space-y-1 text-sm text-muted-foreground">
               <li>• React 18.2.0</li>
               <li>• TypeScript 5.2</li>
@@ -299,7 +296,7 @@ export default function About() {
           <TrendingUp className="w-8 h-8 text-primary flex-shrink-0 mt-1" />
           <div>
             <h2 className="text-2xl font-bold text-foreground mb-3">
-              Future Vision
+              {t('about.futureVision')}
             </h2>
           </div>
         </div>
@@ -307,8 +304,8 @@ export default function About() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {[
             {
-              phase: "Phase 1: Immediate",
-              time: "Week 1-2",
+              phase: t('about.phase1Immediate'),
+              time: t('about.week1_2'),
               items: [
                 "Production monitoring & alerting",
                 "User authentication system",
@@ -317,8 +314,8 @@ export default function About() {
               ]
             },
             {
-              phase: "Phase 2: Short-term",
-              time: "Month 1-2",
+              phase: t('about.phase2ShortTerm'),
+              time: t('about.month1_2'),
               items: [
                 "Query reformulation",
                 "Multi-turn conversations",
@@ -327,8 +324,8 @@ export default function About() {
               ]
             },
             {
-              phase: "Phase 3: Medium-term",
-              time: "Month 3-6",
+              phase: t('about.phase3MediumTerm'),
+              time: t('about.month3_6'),
               items: [
                 "BI Dashboards integration",
                 "Predictive models",
@@ -337,8 +334,8 @@ export default function About() {
               ]
             },
             {
-              phase: "Phase 4: Long-term",
-              time: "Month 6-12",
+              phase: t('about.phase4LongTerm'),
+              time: t('about.month6_12'),
               items: [
                 "Real-time streaming (Kafka)",
                 "Multi-language support",
@@ -373,11 +370,10 @@ export default function About() {
           <Users className="w-8 h-8 text-primary flex-shrink-0 mt-1" />
           <div>
             <h2 className="text-2xl font-bold text-foreground mb-3">
-              Development Team
+              {t('about.developmentTeam')}
             </h2>
             <p className="text-muted-foreground">
-              This project is developed by a team of engineers passionate about Data Engineering, 
-              Machine Learning, and Financial Analytics.
+              {t('about.teamDescription')}
             </p>
           </div>
         </div>
@@ -385,16 +381,16 @@ export default function About() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {[
             {
-              role: "Data Engineering",
-              desc: "Lakehouse architecture, ETL pipelines, Data quality"
+              role: t('about.dataEngineering'),
+              desc: t('about.dataEngineeringDesc')
             },
             {
-              role: "AI/ML Development",
-              desc: "RAG system, Embeddings, NLP processing"
+              role: t('about.aiMlDevelopment'),
+              desc: t('about.aiMlDevelopmentDesc')
             },
             {
-              role: "Full-stack Development",
-              desc: "Backend API, Frontend UI, DevOps"
+              role: t('about.fullStackDevelopment'),
+              desc: t('about.fullStackDevelopmentDesc')
             }
           ].map((team, i) => (
             <div key={i} className="p-4 bg-gradient-to-br from-primary/5 to-secondary/5 rounded-lg">
@@ -406,9 +402,7 @@ export default function About() {
 
         <div className="mt-6 p-4 bg-primary/5 rounded-lg border-l-4 border-primary">
           <p className="text-sm text-foreground">
-            <strong>Open for Collaboration:</strong> We welcome contributions from the community. 
-            If you're interested in the project, check out the <strong>Guide</strong> section to 
-            learn how to contribute code or ideas!
+            <strong>{t('about.openForCollaboration')}</strong> {t('about.collaborationText')}
           </p>
         </div>
       </div>
@@ -424,11 +418,10 @@ export default function About() {
               <Layers className="w-8 h-8 text-primary flex-shrink-0 mt-1" />
               <div className="flex-1">
                 <h2 className="text-2xl font-bold text-foreground mb-3">
-                  Lakehouse Architecture
+                  {t('about.lakehouseArchitecture')}
                 </h2>
                 <p className="text-muted-foreground leading-relaxed mb-4">
-                  A modern data architecture that combines the best of Data Lakes and Data Warehouses,
-                  providing scalable storage with high-performance analytics capabilities.
+                  {t('about.lakehouseDescription')}
                 </p>
               </div>
             </div>
@@ -436,16 +429,16 @@ export default function About() {
 
           {/* Medallion Architecture */}
           <div className="card-lumina">
-            <h3 className="text-xl font-bold text-foreground mb-4">Medallion Architecture (Bronze-Silver-Gold)</h3>
+            <h3 className="text-xl font-bold text-foreground mb-4">{t('about.medallionArchitecture')}</h3>
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {/* Bronze Layer */}
               <div className="p-4 bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-900/20 dark:to-amber-800/20 rounded-lg border-2 border-amber-200 dark:border-amber-800">
                 <div className="flex items-center gap-2 mb-3">
                   <div className="w-3 h-3 rounded-full bg-amber-600"></div>
-                  <h4 className="font-bold text-foreground">Bronze Layer</h4>
+                  <h4 className="font-bold text-foreground">{t('about.bronzeLayer')}</h4>
                 </div>
-                <p className="text-sm text-muted-foreground mb-3">Raw data ingestion from sources</p>
+                <p className="text-sm text-muted-foreground mb-3">{t('about.bronzeLayerDesc')}</p>
                 <ul className="text-xs text-muted-foreground space-y-1">
                   <li>• Original format (JSON, CSV)</li>
                   <li>• No data cleaning</li>
@@ -459,9 +452,9 @@ export default function About() {
               <div className="p-4 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900/20 dark:to-gray-800/20 rounded-lg border-2 border-gray-300 dark:border-gray-700">
                 <div className="flex items-center gap-2 mb-3">
                   <div className="w-3 h-3 rounded-full bg-gray-400"></div>
-                  <h4 className="font-bold text-foreground">Silver Layer</h4>
+                  <h4 className="font-bold text-foreground">{t('about.silverLayer')}</h4>
                 </div>
-                <p className="text-sm text-muted-foreground mb-3">Cleaned & standardized data</p>
+                <p className="text-sm text-muted-foreground mb-3">{t('about.silverLayerDesc')}</p>
                 <ul className="text-xs text-muted-foreground space-y-1">
                   <li>• Parquet format (Snappy)</li>
                   <li>• Removed duplicates & nulls</li>
@@ -475,9 +468,9 @@ export default function About() {
               <div className="p-4 bg-gradient-to-br from-yellow-50 to-yellow-100 dark:from-yellow-900/20 dark:to-yellow-800/20 rounded-lg border-2 border-yellow-300 dark:border-yellow-700">
                 <div className="flex items-center gap-2 mb-3">
                   <div className="w-3 h-3 rounded-full bg-yellow-600"></div>
-                  <h4 className="font-bold text-foreground">Gold Layer</h4>
+                  <h4 className="font-bold text-foreground">{t('about.goldLayer')}</h4>
                 </div>
-                <p className="text-sm text-muted-foreground mb-3">Business-ready aggregates</p>
+                <p className="text-sm text-muted-foreground mb-3">{t('about.goldLayerDesc')}</p>
                 <ul className="text-xs text-muted-foreground space-y-1">
                   <li>• Optimized for queries</li>
                   <li>• Aggregated metrics</li>
@@ -491,10 +484,10 @@ export default function About() {
 
           {/* Data Sources */}
           <div className="card-lumina">
-            <h3 className="text-xl font-bold text-foreground mb-4">Data Sources</h3>
+            <h3 className="text-xl font-bold text-foreground mb-4">{t('about.dataSources')}</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="p-4 bg-secondary/20 rounded-lg">
-                <h4 className="font-semibold text-foreground mb-2">📈 Stock Data</h4>
+                <h4 className="font-semibold text-foreground mb-2">{t('about.stockData')}</h4>
                 <ul className="text-sm text-muted-foreground space-y-1">
                   <li>• Source: VNStock API v3</li>
                   <li>• Symbols: 30 major stocks</li>
@@ -505,7 +498,7 @@ export default function About() {
               </div>
 
               <div className="p-4 bg-secondary/20 rounded-lg">
-                <h4 className="font-semibold text-foreground mb-2">📰 News Data</h4>
+                <h4 className="font-semibold text-foreground mb-2">{t('about.newsData')}</h4>
                 <ul className="text-sm text-muted-foreground space-y-1">
                   <li>• Source: Google Custom Search</li>
                   <li>• Articles: 12,027</li>
@@ -516,7 +509,7 @@ export default function About() {
               </div>
 
               <div className="p-4 bg-secondary/20 rounded-lg">
-                <h4 className="font-semibold text-foreground mb-2">📊 Macro Data</h4>
+                <h4 className="font-semibold text-foreground mb-2">{t('about.macroData')}</h4>
                 <ul className="text-sm text-muted-foreground space-y-1">
                   <li>• Source: Economic APIs</li>
                   <li>• Indicators: 50+</li>
@@ -530,45 +523,45 @@ export default function About() {
 
           {/* Performance Metrics */}
           <div className="card-lumina">
-            <h3 className="text-xl font-bold text-foreground mb-4">Performance & Cost Efficiency</h3>
+            <h3 className="text-xl font-bold text-foreground mb-4">{t('about.performanceCostEfficiency')}</h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="p-4 bg-primary/10 rounded-lg text-center">
                 <div className="text-3xl font-bold text-primary mb-1">87-94%</div>
-                <div className="text-xs text-muted-foreground">Cost Savings vs RDS</div>
+                <div className="text-xs text-muted-foreground">{t('about.costSavingsVsRds')}</div>
               </div>
               <div className="p-4 bg-primary/10 rounded-lg text-center">
                 <div className="text-3xl font-bold text-primary mb-1">0.5-1s</div>
-                <div className="text-xs text-muted-foreground">Query Latency (P50)</div>
+                <div className="text-xs text-muted-foreground">{t('about.queryLatency')}</div>
               </div>
               <div className="p-4 bg-primary/10 rounded-lg text-center">
                 <div className="text-3xl font-bold text-primary mb-1">92%</div>
-                <div className="text-xs text-muted-foreground">Data Compression</div>
+                <div className="text-xs text-muted-foreground">{t('about.dataCompression')}</div>
               </div>
               <div className="p-4 bg-primary/10 rounded-lg text-center">
                 <div className="text-3xl font-bold text-primary mb-1">$6.32</div>
-                <div className="text-xs text-muted-foreground">Monthly Query Cost</div>
+                <div className="text-xs text-muted-foreground">{t('about.monthlyQueryCost')}</div>
               </div>
             </div>
           </div>
 
           {/* AWS Stack */}
           <div className="card-lumina">
-            <h3 className="text-xl font-bold text-foreground mb-4">AWS Infrastructure</h3>
+            <h3 className="text-xl font-bold text-foreground mb-4">{t('about.awsInfrastructure')}</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                 <Cloud className="w-6 h-6 text-blue-600 mb-2" />
-                <h4 className="font-semibold text-foreground mb-2">Amazon S3</h4>
-                <p className="text-sm text-muted-foreground">Data Lake storage with 3 layers (Bronze, Silver, Gold)</p>
+                <h4 className="font-semibold text-foreground mb-2">{t('about.amazonS3')}</h4>
+                <p className="text-sm text-muted-foreground">{t('about.amazonS3Desc')}</p>
               </div>
               <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
                 <Database className="w-6 h-6 text-green-600 mb-2" />
-                <h4 className="font-semibold text-foreground mb-2">AWS Glue</h4>
-                <p className="text-sm text-muted-foreground">Data Catalog with 9 tables across 2 databases</p>
+                <h4 className="font-semibold text-foreground mb-2">{t('about.awsGlue')}</h4>
+                <p className="text-sm text-muted-foreground">{t('about.awsGlueDesc')}</p>
               </div>
               <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
                 <Zap className="w-6 h-6 text-purple-600 mb-2" />
-                <h4 className="font-semibold text-foreground mb-2">AWS Athena</h4>
-                <p className="text-sm text-muted-foreground">Serverless SQL queries on S3 data</p>
+                <h4 className="font-semibold text-foreground mb-2">{t('about.awsAthena')}</h4>
+                <p className="text-sm text-muted-foreground">{t('about.awsAthenaDesc')}</p>
               </div>
             </div>
           </div>
@@ -584,12 +577,10 @@ export default function About() {
               <MessageSquare className="w-8 h-8 text-primary flex-shrink-0 mt-1" />
               <div className="flex-1">
                 <h2 className="text-2xl font-bold text-foreground mb-3">
-                  RAG Chatbot System
+                  {t('about.ragChatbotSystem')}
                 </h2>
                 <p className="text-muted-foreground leading-relaxed mb-4">
-                  Retrieval-Augmented Generation (RAG) chatbot that provides accurate, 
-                  grounded answers about Vietnamese financial markets using real news data 
-                  and advanced AI technology.
+                  {t('about.ragDescription')}
                 </p>
               </div>
             </div>
@@ -597,43 +588,43 @@ export default function About() {
 
           {/* RAG Pipeline */}
           <div className="card-lumina">
-            <h3 className="text-xl font-bold text-foreground mb-4">How RAG Works</h3>
+            <h3 className="text-xl font-bold text-foreground mb-4">{t('about.howRagWorks')}</h3>
             <div className="space-y-4">
               {[
                 {
                   step: 1,
-                  title: "Query Embedding",
-                  desc: "Convert user question to 768-dim vector using Vietnamese-SBERT",
+                  title: t('about.queryEmbedding'),
+                  desc: t('about.queryEmbeddingDesc'),
                   time: "~50ms"
                 },
                 {
                   step: 2,
-                  title: "Vector Search",
-                  desc: "Search 10,585 indexed articles using FAISS for top-5 relevant docs",
+                  title: t('about.vectorSearch'),
+                  desc: t('about.vectorSearchDesc'),
                   time: "<10ms"
                 },
                 {
                   step: 3,
-                  title: "Reranking",
-                  desc: "Cross-encoder reranks results for better relevance",
+                  title: t('about.reranking'),
+                  desc: t('about.rerankingDesc'),
                   time: "~100ms"
                 },
                 {
                   step: 4,
-                  title: "Context Preparation",
-                  desc: "Format top-3 articles as context with sources and metadata",
+                  title: t('about.contextPreparation'),
+                  desc: t('about.contextPreparationDesc'),
                   time: "~10ms"
                 },
                 {
                   step: 5,
-                  title: "LLM Generation",
-                  desc: "Google Gemini generates natural response based on context",
+                  title: t('about.llmGeneration'),
+                  desc: t('about.llmGenerationDesc'),
                   time: "~800ms"
                 },
                 {
                   step: 6,
-                  title: "Response Formatting",
-                  desc: "Return answer with sources, scores, and confidence",
+                  title: t('about.responseFormatting'),
+                  desc: t('about.responseFormattingDesc'),
                   time: "~10ms"
                 }
               ].map((item) => (
@@ -653,17 +644,17 @@ export default function About() {
               ))}
             </div>
             <div className="mt-4 p-3 bg-primary/10 rounded-lg text-center">
-              <span className="text-sm font-semibold text-foreground">Total Response Time: </span>
+              <span className="text-sm font-semibold text-foreground">{t('about.totalResponseTime')} </span>
               <span className="text-lg font-bold text-primary">~5 second</span>
             </div>
           </div>
 
           {/* RAG Technology */}
           <div className="card-lumina">
-            <h3 className="text-xl font-bold text-foreground mb-4">Technology Stack</h3>
+            <h3 className="text-xl font-bold text-foreground mb-4">{t('about.ragTechnologyStack')}</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="p-4 bg-secondary/20 rounded-lg">
-                <h4 className="font-semibold text-foreground mb-3">Embedding & Search</h4>
+                <h4 className="font-semibold text-foreground mb-3">{t('about.embeddingSearch')}</h4>
                 <ul className="text-sm text-muted-foreground space-y-2">
                   <li className="flex items-start gap-2">
                     <span className="text-primary mt-1">•</span>
@@ -681,7 +672,7 @@ export default function About() {
               </div>
 
               <div className="p-4 bg-secondary/20 rounded-lg">
-                <h4 className="font-semibold text-foreground mb-3">Generation & Storage</h4>
+                <h4 className="font-semibold text-foreground mb-3">{t('about.generationStorage')}</h4>
                 <ul className="text-sm text-muted-foreground space-y-2">
                   <li className="flex items-start gap-2">
                     <span className="text-primary mt-1">•</span>
@@ -702,27 +693,27 @@ export default function About() {
 
           {/* RAG Features */}
           <div className="card-lumina">
-            <h3 className="text-xl font-bold text-foreground mb-4">Key Features</h3>
+            <h3 className="text-xl font-bold text-foreground mb-4">{t('about.ragKeyFeatures')}</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
                 <div className="text-2xl mb-2">✅</div>
-                <h4 className="font-semibold text-foreground mb-2">No Hallucination</h4>
+                <h4 className="font-semibold text-foreground mb-2">{t('about.noHallucination')}</h4>
                 <p className="text-sm text-muted-foreground">
-                  Answers grounded in real news articles with source citations
+                  {t('about.noHallucinationDesc')}
                 </p>
               </div>
               <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                 <div className="text-2xl mb-2">🇻🇳</div>
-                <h4 className="font-semibold text-foreground mb-2">Vietnamese Support</h4>
+                <h4 className="font-semibold text-foreground mb-2">{t('about.vietnameseSupport')}</h4>
                 <p className="text-sm text-muted-foreground">
-                  Optimized for Vietnamese language queries and responses
+                  {t('about.vietnameseSupportDesc')}
                 </p>
               </div>
               <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
                 <div className="text-2xl mb-2">⚡</div>
-                <h4 className="font-semibold text-foreground mb-2">Fast & Accurate</h4>
+                <h4 className="font-semibold text-foreground mb-2">{t('about.fastAccurate')}</h4>
                 <p className="text-sm text-muted-foreground">
-                  Sub-second vector search with high relevance scores
+                  {t('about.fastAccurateDesc')}
                 </p>
               </div>
             </div>
@@ -730,30 +721,30 @@ export default function About() {
 
           {/* RAG Stats */}
           <div className="card-lumina">
-            <h3 className="text-xl font-bold text-foreground mb-4">System Statistics</h3>
+            <h3 className="text-xl font-bold text-foreground mb-4">{t('about.ragSystemStatistics')}</h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="p-4 bg-primary/10 rounded-lg text-center">
                 <div className="text-3xl font-bold text-primary mb-1">10,585</div>
-                <div className="text-xs text-muted-foreground">Indexed Vectors</div>
+                <div className="text-xs text-muted-foreground">{t('about.indexedVectors')}</div>
               </div>
               <div className="p-4 bg-primary/10 rounded-lg text-center">
                 <div className="text-3xl font-bold text-primary mb-1">12,027</div>
-                <div className="text-xs text-muted-foreground">News Articles</div>
+                <div className="text-xs text-muted-foreground">{t('about.newsArticles')}</div>
               </div>
               <div className="p-4 bg-primary/10 rounded-lg text-center">
                 <div className="text-3xl font-bold text-primary mb-1">&lt;10ms</div>
-                <div className="text-xs text-muted-foreground">Vector Search Time</div>
+                <div className="text-xs text-muted-foreground">{t('about.vectorSearchTime')}</div>
               </div>
               <div className="p-4 bg-primary/10 rounded-lg text-center">
                 <div className="text-3xl font-bold text-primary mb-1">768</div>
-                <div className="text-xs text-muted-foreground">Embedding Dimensions</div>
+                <div className="text-xs text-muted-foreground">{t('about.embeddingDimensions')}</div>
               </div>
             </div>
           </div>
 
           {/* Initial Training (Kaggle) */}
           <div className="card-lumina border-l-4 border-blue-500">
-            <h3 className="text-xl font-bold text-foreground mb-4">Initial RAG Training (Kaggle)</h3>
+            <h3 className="text-xl font-bold text-foreground mb-4">{t('about.initialRagTraining')}</h3>
             <div className="space-y-4">
               <p className="text-sm text-muted-foreground">
                 The initial vector database was created using Kaggle notebooks with GPU acceleration for faster embedding generation.
@@ -761,7 +752,7 @@ export default function About() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                  <h4 className="font-semibold text-foreground mb-3">Training Process</h4>
+                  <h4 className="font-semibold text-foreground mb-3">{t('about.trainingProcess')}</h4>
                   <ol className="text-sm text-muted-foreground space-y-2">
                     <li className="flex items-start gap-2">
                       <span className="font-bold text-primary">1.</span>
@@ -833,12 +824,10 @@ export default function About() {
               <GitBranch className="w-8 h-8 text-primary flex-shrink-0 mt-1" />
               <div className="flex-1">
                 <h2 className="text-2xl font-bold text-foreground mb-3">
-                  Apache Airflow ETL Pipeline
+                  {t('about.airflowEtlPipeline')}
                 </h2>
                 <p className="text-muted-foreground leading-relaxed mb-4">
-                  Fully automated ETL pipeline orchestrated by Apache Airflow, processing data 
-                  from multiple sources through Bronze-Silver-Gold layers using PySpark for 
-                  distributed computing.
+                  {t('about.airflowDescription')}
                 </p>
               </div>
             </div>
@@ -846,55 +835,55 @@ export default function About() {
 
           {/* Pipeline Stages */}
           <div className="card-lumina">
-            <h3 className="text-xl font-bold text-foreground mb-4">ETL Pipeline Stages</h3>
+            <h3 className="text-xl font-bold text-foreground mb-4">{t('about.etlPipelineStages')}</h3>
             <div className="space-y-4">
               {[
                 {
                   step: 1,
-                  title: "Bronze Layer (08:00-09:30 UTC)",
-                  desc: "Data collection from APIs",
+                  title: t('about.bronzeLayerStage'),
+                  desc: t('about.bronzeLayerStageDesc'),
                   tasks: ["Fetch 30 stock symbols", "Crawl 12K+ news articles", "Collect 50+ macro indicators"],
                   duration: "1.5 hours"
                 },
                 {
                   step: 2,
-                  title: "Silver Layer (10:00-11:30 UTC)",
-                  desc: "Data cleaning & standardization",
+                  title: t('about.silverLayerStage'),
+                  desc: t('about.silverLayerStageDesc'),
                   tasks: ["Remove duplicates & nulls", "Validate schemas", "Parquet conversion with Snappy"],
                   duration: "1.5 hours"
                 },
                 {
                   step: 3,
-                  title: "Gold Layer (13:00-14:30 UTC)",
-                  desc: "Feature engineering & aggregation",
+                  title: t('about.goldLayerStage'),
+                  desc: t('about.goldLayerStageDesc'),
                   tasks: ["Calculate technical indicators", "Aggregate sentiment scores", "Compute market metrics"],
                   duration: "1.5 hours"
                 },
                 {
                   step: 4,
-                  title: "RAG Pipeline (14:30-15:00 UTC)",
-                  desc: "Vector database update for chatbot",
+                  title: t('about.ragPipelineStage'),
+                  desc: t('about.ragPipelineStageDesc'),
                   tasks: ["Extract news from Silver layer", "Generate Vietnamese SBERT embeddings", "Update FAISS index with deduplication"],
                   duration: "30 minutes"
                 },
                 {
                   step: 5,
-                  title: "Quality Check (15:00-15:15 UTC)",
-                  desc: "Data validation & monitoring",
+                  title: t('about.qualityCheckStage'),
+                  desc: t('about.qualityCheckStageDesc'),
                   tasks: ["Validate row counts", "Check schema consistency", "Compare with baseline"],
                   duration: "15 minutes"
                 },
                 {
                   step: 6,
-                  title: "Glue Catalog Update (15:30-15:45 UTC)",
-                  desc: "Metadata synchronization",
+                  title: t('about.glueCatalogStage'),
+                  desc: t('about.glueCatalogStageDesc'),
                   tasks: ["Update partition metadata", "Refresh statistics", "Enable Athena queries"],
                   duration: "15 minutes"
                 },
                 {
                   step: 7,
-                  title: "Notification (15:45-16:00 UTC)",
-                  desc: "Status reporting",
+                  title: t('about.notificationStage'),
+                  desc: t('about.notificationStageDesc'),
                   tasks: ["Send summary email", "Slack notification", "Log to CloudWatch"],
                   duration: "15 minutes"
                 }
@@ -926,18 +915,18 @@ export default function About() {
               ))}
             </div>
             <div className="mt-4 p-3 bg-primary/10 rounded-lg text-center">
-              <span className="text-sm font-semibold text-foreground">Total Pipeline Duration: </span>
+              <span className="text-sm font-semibold text-foreground">{t('about.totalPipelineDuration')} </span>
               <span className="text-lg font-bold text-primary">~7 hours</span>
-              <span className="text-sm text-muted-foreground ml-2">(Daily at 09:00 UTC)</span>
+              <span className="text-sm text-muted-foreground ml-2">{t('about.dailyAt')}</span>
             </div>
           </div>
 
           {/* Technology Stack */}
           <div className="card-lumina">
-            <h3 className="text-xl font-bold text-foreground mb-4">Technology Stack</h3>
+            <h3 className="text-xl font-bold text-foreground mb-4">{t('about.pipelineTechnologyStack')}</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="p-4 bg-secondary/20 rounded-lg">
-                <h4 className="font-semibold text-foreground mb-3">Orchestration</h4>
+                <h4 className="font-semibold text-foreground mb-3">{t('about.orchestration')}</h4>
                 <ul className="text-sm text-muted-foreground space-y-2">
                   <li className="flex items-start gap-2">
                     <span className="text-primary mt-1">•</span>
@@ -955,7 +944,7 @@ export default function About() {
               </div>
 
               <div className="p-4 bg-secondary/20 rounded-lg">
-                <h4 className="font-semibold text-foreground mb-3">Processing</h4>
+                <h4 className="font-semibold text-foreground mb-3">{t('about.processing')}</h4>
                 <ul className="text-sm text-muted-foreground space-y-2">
                   <li className="flex items-start gap-2">
                     <span className="text-primary mt-1">•</span>
@@ -973,7 +962,7 @@ export default function About() {
               </div>
 
               <div className="p-4 bg-secondary/20 rounded-lg">
-                <h4 className="font-semibold text-foreground mb-3">RAG Pipeline</h4>
+                <h4 className="font-semibold text-foreground mb-3">{t('about.ragPipeline')}</h4>
                 <ul className="text-sm text-muted-foreground space-y-2">
                   <li className="flex items-start gap-2">
                     <span className="text-primary mt-1">•</span>
@@ -994,16 +983,15 @@ export default function About() {
 
           {/* PySpark Details */}
           <div className="card-lumina">
-            <h3 className="text-xl font-bold text-foreground mb-4">PySpark Distributed Processing</h3>
+            <h3 className="text-xl font-bold text-foreground mb-4">{t('about.pysparkDistributed')}</h3>
             <div className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                PySpark enables distributed data processing across multiple nodes, handling large-scale data transformations 
-                efficiently with parallel computing.
+                {t('about.pysparkDesc')}
               </p>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="p-4 bg-secondary/20 rounded-lg">
-                  <h4 className="font-semibold text-foreground mb-3">Cluster Configuration</h4>
+                  <h4 className="font-semibold text-foreground mb-3">{t('about.clusterConfiguration')}</h4>
                   <ul className="text-sm text-muted-foreground space-y-1">
                     <li>• 5 worker nodes (parallel processing)</li>
                     <li>• 4 cores per node (20 cores total)</li>
@@ -1014,7 +1002,7 @@ export default function About() {
                 </div>
 
                 <div className="p-4 bg-secondary/20 rounded-lg">
-                  <h4 className="font-semibold text-foreground mb-3">Key Operations</h4>
+                  <h4 className="font-semibold text-foreground mb-3">{t('about.keyOperations')}</h4>
                   <ul className="text-sm text-muted-foreground space-y-1">
                     <li>• Data cleaning & deduplication</li>
                     <li>• Schema validation & standardization</li>
@@ -1029,27 +1017,27 @@ export default function About() {
 
           {/* Pipeline Features */}
           <div className="card-lumina">
-            <h3 className="text-xl font-bold text-foreground mb-4">Key Features</h3>
+            <h3 className="text-xl font-bold text-foreground mb-4">{t('about.pipelineFeatures')}</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
                 <div className="text-2xl mb-2">🤖</div>
-                <h4 className="font-semibold text-foreground mb-2">Fully Automated</h4>
+                <h4 className="font-semibold text-foreground mb-2">{t('about.fullyAutomated')}</h4>
                 <p className="text-sm text-muted-foreground">
-                  Runs daily without manual intervention, with automatic retry on failure
+                  {t('about.fullyAutomatedDesc')}
                 </p>
               </div>
               <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                 <div className="text-2xl mb-2">📊</div>
-                <h4 className="font-semibold text-foreground mb-2">Parallel Processing</h4>
+                <h4 className="font-semibold text-foreground mb-2">{t('about.parallelProcessing')}</h4>
                 <p className="text-sm text-muted-foreground">
-                  PySpark distributes workload across multiple nodes for faster processing
+                  {t('about.parallelProcessingDesc')}
                 </p>
               </div>
               <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
                 <div className="text-2xl mb-2">🔍</div>
-                <h4 className="font-semibold text-foreground mb-2">Quality Monitoring</h4>
+                <h4 className="font-semibold text-foreground mb-2">{t('about.qualityMonitoring')}</h4>
                 <p className="text-sm text-muted-foreground">
-                  Built-in data quality checks and alerts for anomaly detection
+                  {t('about.qualityMonitoringDesc')}
                 </p>
               </div>
             </div>
@@ -1057,33 +1045,33 @@ export default function About() {
 
           {/* Pipeline Stats */}
           <div className="card-lumina">
-            <h3 className="text-xl font-bold text-foreground mb-4">Pipeline Statistics</h3>
+            <h3 className="text-xl font-bold text-foreground mb-4">{t('about.pipelineStatistics')}</h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="p-4 bg-primary/10 rounded-lg text-center">
                 <div className="text-3xl font-bold text-primary mb-1">365</div>
-                <div className="text-xs text-muted-foreground">Daily Runs/Year</div>
+                <div className="text-xs text-muted-foreground">{t('about.dailyRunsYear')}</div>
               </div>
               <div className="p-4 bg-primary/10 rounded-lg text-center">
                 <div className="text-3xl font-bold text-primary mb-1">90%</div>
-                <div className="text-xs text-muted-foreground">Success Rate</div>
+                <div className="text-xs text-muted-foreground">{t('about.successRate')}</div>
               </div>
               <div className="p-4 bg-primary/10 rounded-lg text-center">
                 <div className="text-3xl font-bold text-primary mb-1">7h</div>
-                <div className="text-xs text-muted-foreground">Average Duration</div>
+                <div className="text-xs text-muted-foreground">{t('about.averageDuration')}</div>
               </div>
               <div className="p-4 bg-primary/10 rounded-lg text-center">
                 <div className="text-3xl font-bold text-primary mb-1">3</div>
-                <div className="text-xs text-muted-foreground">Data Layers Processed</div>
+                <div className="text-xs text-muted-foreground">{t('about.dataLayersProcessed')}</div>
               </div>
             </div>
           </div>
 
           {/* Infrastructure */}
           <div className="card-lumina">
-            <h3 className="text-xl font-bold text-foreground mb-4">Infrastructure</h3>
+            <h3 className="text-xl font-bold text-foreground mb-4">{t('about.infrastructure')}</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="p-4 bg-secondary/20 rounded-lg">
-                <h4 className="font-semibold text-foreground mb-3">Airflow Deployment</h4>
+                <h4 className="font-semibold text-foreground mb-3">{t('about.airflowDeployment')}</h4>
                 <ul className="text-sm text-muted-foreground space-y-1">
                   <li>• Docker Compose (development)</li>
                   <li>• Docker Compose (production)</li>
@@ -1094,7 +1082,7 @@ export default function About() {
               </div>
 
               <div className="p-4 bg-secondary/20 rounded-lg">
-                <h4 className="font-semibold text-foreground mb-3">Spark Cluster</h4>
+                <h4 className="font-semibold text-foreground mb-3">{t('about.sparkCluster')}</h4>
                 <ul className="text-sm text-muted-foreground space-y-1">
                   <li>• Standalone cluster mode</li>
                   <li>• 5 worker nodes</li>
