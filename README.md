@@ -1,6 +1,9 @@
-# 🏦 Finance Analytics Platform
+# 🛡️ AEGIS LUMINA
+## The AI Shield That Illuminates Your Data
 
-> An enterprise-grade financial analytics platform combining Lakehouse architecture, automated ETL pipelines, and AI-powered chatbot for Vietnamese stock market analysis.
+> **Named after the divine shield of Zeus and Athena (AEGIS) combined with the light of wisdom (LUMINA)**
+> 
+> An enterprise-grade AI system that protects and illuminates financial data - like the watchful eye of Athena upon her legendary shield. Features Lakehouse architecture, automated ETL pipelines, and AI-powered RAG chatbot for Vietnamese stock market analysis.
 
 [![Status](https://img.shields.io/badge/status-production-brightgreen)](https://github.com/lephucchi/finance_portfolio)
 [![Version](https://img.shields.io/badge/version-1.0.0-blue)](https://github.com/lephucchi/finance_portfolio/releases)

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Search, Sun, Moon, LogOut, Eye } from "lucide-react";
+import { Search, Sun, Moon, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface HeaderProps {
@@ -15,15 +15,19 @@ export default function Header({ isDarkMode, onToggleDarkMode }: HeaderProps) {
       <div className="flex h-16 items-center justify-between px-6">
         {/* Logo & Branding */}
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center shadow-md">
-            <Eye className="w-5 h-5 text-primary-foreground" />
+          <div className="w-12 h-12 rounded-lg flex items-center justify-center">
+            <img 
+              src="/AEGIS_LUMINA.png" 
+              alt="AEGIS LUMINA Logo" 
+              className="w-12 h-12 object-contain"
+            />
           </div>
           <div className="flex flex-col">
             <span className="font-semibold text-base tracking-tight hidden sm:inline text-foreground">
-              AEGIS: Lumina
+              AEGIS LUMINA
             </span>
             <span className="text-xs text-muted-foreground hidden sm:inline">
-              Clarity & Insight
+              The AI Shield
             </span>
           </div>
         </div>

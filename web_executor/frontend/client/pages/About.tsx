@@ -12,11 +12,20 @@ export default function About() {
       {/* Header */}
       <div className="card-lumina bg-gradient-to-br from-primary/10 to-secondary/10">
         <div className="text-center py-8">
-          <h1 className="text-4xl font-bold text-foreground mb-4">
-            Finance Analytics Platform
-          </h1>
-          <p className="text-xl text-muted-foreground mb-2">
-            Powered by Modern Lakehouse Architecture & AI
+          <div className="flex justify-center mb-4">
+            <img 
+              src="/AEGIS_LUMINA.png" 
+              alt="AEGIS LUMINA Logo" 
+              className="w-48 h-48 md:w-56 md:h-56 object-contain"
+            />
+          </div>
+          <p className="text-lg text-primary font-semibold mb-3 italic">
+            "The AI Shield That Illuminates Your Data"
+          </p>
+          <p className="text-base text-muted-foreground mb-4 max-w-3xl mx-auto px-4">
+            Named after the divine shield of Zeus and Athena (AEGIS) combined with the light of wisdom (LUMINA) – 
+            An AI system that protects and illuminates all your financial data, 
+            like the watchful eye of Athena upon her legendary shield.
           </p>
           <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
             <span className="px-3 py-1 bg-primary/20 text-primary rounded-full font-medium">

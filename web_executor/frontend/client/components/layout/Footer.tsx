@@ -81,12 +81,12 @@ export default function Footer() {
         {/* Bottom Bar */}
         <div className="border-t border-border/30 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="text-xs text-muted-foreground">
-            © {currentYear} AEGIS: Lumina. All rights reserved.
+            © {currentYear} AEGIS LUMINA. All rights reserved.
           </div>
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
-            <span>v2.1.0</span>
+            <span>v1.0.0</span>
             <span className="text-border">•</span>
-            <span className="text-primary">Ready to Analyze</span>
+            <span className="text-primary">Production Ready</span>
           </div>
         </div>
       </div>
