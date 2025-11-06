@@ -10,9 +10,8 @@ interface Message {
   content: string;
   timestamp: Date;
   sources?: Array<{
-    id: number;
-    text: string;
-    score: number;
+    source: string;
+    link: string;
   }>;
 }
 
@@ -359,11 +358,18 @@ export default function Chat() {
                         {message.sources.map((source, i) => (
                           <div key={i} className="text-xs bg-secondary/30 p-2 rounded">
                             <div className="font-medium text-primary mb-1">
-                              {t('oracleChat.sourceLabel')} {i + 1} ({(source.score * 100).toFixed(1)}% {t('oracleChat.relatedLabel')})
+                              {t('oracleChat.sourceLabel')} {i + 1}: {source.source}
                             </div>
-                            <p className="line-clamp-3 text-muted-foreground">
-                              {source.text}
-                            </p>
+                            {source.link && (
+                              <a 
+                                href={source.link} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="text-blue-600 hover:underline break-all"
+                              >
+                                {source.link}
+                              </a>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -409,15 +415,25 @@ export default function Chat() {
             {t('oracleChat.suggestionsLabel')}
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-            {(t('oracleChat.suggestedQuestionsData') as any || []).map((disc: string, idx: number) => (
-              <button
-                key={idx}
-                onClick={() => handleSendMessage(disc)}
-                className="text-left text-xs px-3 py-2 rounded-lg bg-secondary/30 hover:bg-primary/10 hover:text-primary transition-colors text-foreground"
-              >
-                {disc}
-              </button>
-            ))}
+            {(() => {
+              const suggestions = t('oracleChat.suggestedQuestionsData');
+              // Ensure we have an array - handle both array and string returns
+              const questionsArray = Array.isArray(suggestions) 
+                ? suggestions 
+                : (typeof suggestions === 'string' 
+                    ? [] 
+                    : Object.values(suggestions || {}).filter((v): v is string => typeof v === 'string'));
+              
+              return questionsArray.map((disc: string, idx: number) => (
+                <button
+                  key={idx}
+                  onClick={() => handleSendMessage(disc)}
+                  className="text-left text-xs px-3 py-2 rounded-lg bg-secondary/30 hover:bg-primary/10 hover:text-primary transition-colors text-foreground"
+                >
+                  {disc}
+                </button>
+              ));
+            })()}
           </div>
         </div>
       )}

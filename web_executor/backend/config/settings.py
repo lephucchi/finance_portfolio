@@ -102,7 +102,7 @@ class Settings(BaseSettings):
     # ========================
     RAG_ENABLED: bool = True
     RAG_MODEL_NAME: str = "intfloat/multilingual-e5-large"  # 1024-dim, matches FAISS index
-    RAG_FAISS_INDEX_PATH: str = "data/rag/faiss_index.bin"
+    RAG_FAISS_INDEX_PATH: str = "data/rag/vector_index.faiss"  # Fixed: was faiss_index.bin
     RAG_METADATA_PATH: str = "data/rag/metadata.json"
     RAG_EMBEDDINGS_PATH: str = "data/rag/embeddings.npy"
     RAG_TOP_K: int = 5

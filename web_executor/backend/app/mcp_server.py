@@ -237,16 +237,17 @@ class RAGMCPServer:
             min(top_k, self.rag_service.index.ntotal)
         )
         
-        # Retrieve documents
+        # Retrieve documents with new metadata format
         results = []
-        texts = self.rag_service.metadata.get('texts', [])
-        ids = self.rag_service.metadata.get('ids', [])
-        
         for idx, distance in zip(indices[0], distances[0]):
-            if idx < len(texts):
+            if idx < len(self.rag_service.metadata):
+                doc = self.rag_service.metadata[idx]
                 results.append({
-                    'id': ids[idx] if idx < len(ids) else idx,
-                    'text': texts[idx],
+                    'id': doc.get('row_id', idx),
+                    'title': doc.get('title', ''),
+                    'source': doc.get('source', ''),
+                    'link': doc.get('link', ''),
+                    'date': doc.get('date', ''),
                     'score': float(distance),
                 })
         

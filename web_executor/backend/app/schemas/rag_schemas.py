@@ -95,9 +95,8 @@ class RAGQueryRequest(BaseModel):
 class RetrievedDocument(BaseModel):
     """Single retrieved document from vector search."""
     
-    id: Any = Field(..., description="Document ID")
-    text: str = Field(..., description="Document text")
-    score: float = Field(..., description="Similarity score")
+    source: str = Field(..., description="News source (cafef.vn, vietstock.vn, etc.)")
+    link: str = Field(..., description="Link to original article")
 
 
 class RAGQueryResponse(BaseModel):
@@ -116,17 +115,20 @@ class RAGQueryResponse(BaseModel):
         json_schema_extra = {
             "example": {
                 "success": True,
-                "answer": "Thị trường chứng khoán Việt Nam tuần này có xu hướng tích cực...",
+                "answer": "Người tìm tri thức ơi, dựa trên kho tri thức của AEGIS: Lumina...",
                 "sources": [
                     {
-                        "id": 12345,
-                        "text": "VN-Index tăng 2.5% trong phiên...",
-                        "score": 0.89
+                        "source": "cafef.vn",
+                        "link": "https://cafef.vn/tin-tuc-12345"
+                    },
+                    {
+                        "source": "vietstock.vn",
+                        "link": "https://vietstock.vn/bai-viet-67890"
                     }
                 ],
                 "query": "Tình hình thị trường chứng khoán Việt Nam tuần này như thế nào?",
-                "timestamp": "2025-11-04T10:00:00Z",
-                "model": "gemini-1.5-flash",
+                "timestamp": "2025-11-06T10:00:00Z",
+                "model": "gemini-2.5-flash",
                 "top_k": 5
             }
         }
