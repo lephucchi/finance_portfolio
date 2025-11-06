@@ -14,6 +14,9 @@ import Screener from "./pages/Screener";
 import Trends from "./pages/Trends";
 import Reports from "./pages/Reports";
 import Chat from "./pages/Chat";
+import About from "./pages/About";
+import Guide from "./pages/Guide";
+import Disclaimer from "./pages/Disclaimer";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -33,6 +36,9 @@ const App = () => (
               <Route path="/trends" element={<Trends />} />
               <Route path="/reports" element={<Reports />} />
               <Route path="/chat" element={<Chat />} />
+              <Route path="/about" element={<About />} />
+              <Route path="/guide" element={<Guide />} />
+              <Route path="/disclaimer" element={<Disclaimer />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>

@@ -8,22 +8,22 @@ export default function Footer() {
           {/* Documentation */}
           <div>
             <h4 className="text-xs font-semibold text-primary mb-3 uppercase tracking-wide">
-              Docs
+              Documentation
             </h4>
             <ul className="space-y-2 text-xs text-muted-foreground">
               <li>
-                <a href="#" className="hover:text-primary transition-colors">
-                  API Reference
+                <a href="/about" className="hover:text-primary transition-colors">
+                  About Project
                 </a>
               </li>
               <li>
-                <a href="#" className="hover:text-primary transition-colors">
-                  Data Schema
+                <a href="/guide" className="hover:text-primary transition-colors">
+                  User Guide
                 </a>
               </li>
               <li>
-                <a href="#" className="hover:text-primary transition-colors">
-                  Getting Started
+                <a href="/guide" className="hover:text-primary transition-colors">
+                  Developer Guide
                 </a>
               </li>
             </ul>
@@ -32,22 +32,22 @@ export default function Footer() {
           {/* Resources */}
           <div>
             <h4 className="text-xs font-semibold text-primary mb-3 uppercase tracking-wide">
-              Resources
+              Features
             </h4>
             <ul className="space-y-2 text-xs text-muted-foreground">
               <li>
-                <a href="#" className="hover:text-primary transition-colors">
-                  Guides
+                <a href="/" className="hover:text-primary transition-colors">
+                  Dashboard
                 </a>
               </li>
               <li>
-                <a href="#" className="hover:text-primary transition-colors">
-                  Blog
+                <a href="/screener" className="hover:text-primary transition-colors">
+                  Asset Finder
                 </a>
               </li>
               <li>
-                <a href="#" className="hover:text-primary transition-colors">
-                  Support
+                <a href="/chat" className="hover:text-primary transition-colors">
+                  Metallica Chatbot
                 </a>
               </li>
             </ul>
@@ -56,22 +56,22 @@ export default function Footer() {
           {/* Legal */}
           <div>
             <h4 className="text-xs font-semibold text-primary mb-3 uppercase tracking-wide">
-              Legal
+              Legal & Information
             </h4>
             <ul className="space-y-2 text-xs text-muted-foreground">
               <li>
-                <a href="#" className="hover:text-primary transition-colors">
-                  Privacy
+                <a href="/disclaimer" className="hover:text-primary transition-colors">
+                  Disclaimer
                 </a>
               </li>
               <li>
-                <a href="#" className="hover:text-primary transition-colors">
-                  Terms
+                <a href="/disclaimer" className="hover:text-primary transition-colors">
+                  Terms of Use
                 </a>
               </li>
               <li>
-                <a href="#" className="hover:text-primary transition-colors">
-                  Contact
+                <a href="/guide" className="hover:text-primary transition-colors">
+                  Contact & Support
                 </a>
               </li>
             </ul>
