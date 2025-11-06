@@ -158,12 +158,48 @@ class HealthCheckResponse(BaseModel):
 # ========================
 
 
-class DashboardSummaryResponse(BaseModel):
-    """Overall dashboard summary."""
+class MarketStatsResponse(BaseModel):
+    """Market statistics."""
 
-    total_stocks: int = Field(default=0, description="Total stocks tracked")
-    market_change_pct: float = Field(default=0.0, description="Market change percentage")
-    avg_sentiment: float = Field(default=0.0, description="Average market sentiment")
-    top_gainers: list[StockDataResponse] = Field(default_factory=list, description="Top gaining stocks")
-    top_losers: list[StockDataResponse] = Field(default_factory=list, description="Top losing stocks")
-    latest_update: Optional[datetime] = Field(default=None, description="Last data update time")
+    total_stocks: int = Field(description="Total stocks tracked")
+    market_change_pct: float = Field(description="Market change percentage")
+    advancing: int = Field(description="Number of advancing stocks")
+    declining: int = Field(description="Number of declining stocks")
+    unchanged: int = Field(description="Number of unchanged stocks")
+    total_volume: int = Field(description="Total market volume")
+
+
+class SentimentStatsResponse(BaseModel):
+    """Sentiment statistics."""
+
+    avg_score: float = Field(description="Average sentiment score")
+    positive_pct: float = Field(description="Percentage of positive articles")
+    total_articles: int = Field(description="Total articles analyzed")
+
+
+class MacroStatsResponse(BaseModel):
+    """Macro economic statistics."""
+
+    cpi: float = Field(description="CPI indicator value")
+    usd_vnd: float = Field(description="USD to VND exchange rate")
+
+
+class TopStockResponse(BaseModel):
+    """Top stock response."""
+
+    symbol: str = Field(description="Stock symbol")
+    price_change_pct: float = Field(description="Price change percentage")
+    close: float = Field(description="Closing price")
+    volume: int = Field(description="Trading volume")
+
+
+class DashboardSummaryResponse(BaseModel):
+    """Overall dashboard summary with nested structure."""
+
+    date: str = Field(description="Summary date")
+    market: MarketStatsResponse = Field(description="Market statistics")
+    top_gainers: list[TopStockResponse] = Field(description="Top gaining stocks")
+    top_losers: list[TopStockResponse] = Field(description="Top losing stocks")
+    sentiment: SentimentStatsResponse = Field(description="Sentiment statistics")
+    macro: MacroStatsResponse = Field(description="Macro economic statistics")
+    latest_update: Optional[str] = Field(default=None, description="Last data update time")

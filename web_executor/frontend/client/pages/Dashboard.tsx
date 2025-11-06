@@ -228,32 +228,32 @@ export default function Dashboard() {
       </div>
 
       {/* Key Metrics Grid */}
-      {dashboardData && (
+      {dashboardData?.market && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {[
             {
               label: "Market Change",
-              value: formatPercent(dashboardData.market.market_change_pct),
-              change: `${dashboardData.market.total_stocks} stocks`,
-              positive: dashboardData.market.market_change_pct >= 0,
+              value: formatPercent(dashboardData.market.market_change_pct ?? 0),
+              change: `${dashboardData.market.total_stocks ?? 0} stocks`,
+              positive: (dashboardData.market.market_change_pct ?? 0) >= 0,
             },
             {
               label: "Advancing",
-              value: dashboardData.market.advancing.toString(),
-              change: `${dashboardData.market.declining} declining`,
+              value: (dashboardData.market.advancing ?? 0).toString(),
+              change: `${dashboardData.market.declining ?? 0} declining`,
               positive: true,
             },
             {
               label: "Total Volume",
-              value: `${(dashboardData.market.total_volume / 1000000).toFixed(0)}M`,
+              value: `${((dashboardData.market.total_volume ?? 0) / 1000000).toFixed(0)}M`,
               change: "daily volume",
               positive: true,
             },
             {
               label: "Avg Sentiment",
-              value: dashboardData.sentiment.avg_score.toFixed(2),
-              change: `${dashboardData.sentiment.total_articles} articles`,
-              positive: dashboardData.sentiment.avg_score >= 0.3,
+              value: (dashboardData.sentiment?.avg_score ?? 0).toFixed(2),
+              change: `${dashboardData.sentiment?.total_articles ?? 0} articles`,
+              positive: (dashboardData.sentiment?.avg_score ?? 0) >= 0.3,
             },
           ].map((metric, idx) => {
             const Icon = metric.positive ? TrendingUp : TrendingDown;
@@ -361,11 +361,11 @@ export default function Dashboard() {
             Market Insights
           </h2>
           <div className="space-y-3">
-            {dashboardData &&
+            {dashboardData?.market && dashboardData?.sentiment &&
               [
-                `Market change: ${formatPercent(dashboardData.market.market_change_pct)}`,
-                `Sentiment: ${dashboardData.sentiment.positive_pct.toFixed(1)}% positive articles`,
-                `Volume strength: ${(dashboardData.market.total_volume / 1000000000).toFixed(1)}B shares`,
+                `Market change: ${formatPercent(dashboardData.market.market_change_pct ?? 0)}`,
+                `Sentiment: ${(dashboardData.sentiment.positive_pct ?? 0).toFixed(1)}% positive articles`,
+                `Volume strength: ${((dashboardData.market.total_volume ?? 0) / 1000000000).toFixed(1)}B shares`,
               ].map((insight, i) => (
                 <div
                   key={i}
@@ -381,26 +381,26 @@ export default function Dashboard() {
       </div>
 
       {/* Strategic Summary */}
-      {dashboardData && (
+      {dashboardData?.market && dashboardData?.sentiment && (
         <div className="card-lumina border-l-4 border-primary">
           <h3 className="font-semibold text-primary mb-2">Market Overview</h3>
           <p className="text-sm text-foreground leading-relaxed">
-            {dashboardData.market.advancing > dashboardData.market.declining
+            {(dashboardData.market.advancing ?? 0) > (dashboardData.market.declining ?? 0)
               ? `Market showing positive momentum with ${dashboardData.market.advancing} advancing stocks vs ${dashboardData.market.declining} declining. `
               : `Market showing mixed signals with ${dashboardData.market.declining} declining stocks. `}
-            Sentiment score of {dashboardData.sentiment.avg_score.toFixed(2)}{" "}
+            Sentiment score of {(dashboardData.sentiment.avg_score ?? 0).toFixed(2)}{" "}
             indicates{" "}
-            {dashboardData.sentiment.avg_score >= 0.3
+            {(dashboardData.sentiment.avg_score ?? 0) >= 0.3
               ? "positive"
-              : dashboardData.sentiment.avg_score <= -0.3
+              : (dashboardData.sentiment.avg_score ?? 0) <= -0.3
                 ? "negative"
                 : "neutral"}{" "}
-            market sentiment based on {dashboardData.sentiment.total_articles}{" "}
+            market sentiment based on {dashboardData.sentiment.total_articles ?? 0}{" "}
             analyzed articles.
           </p>
           <p className="text-xs text-muted-foreground mt-3">
             Last updated:{" "}
-            {new Date(dashboardData.latest_update).toLocaleString()}
+            {dashboardData.latest_update ? new Date(dashboardData.latest_update).toLocaleString() : "N/A"}
           </p>
         </div>
       )}
