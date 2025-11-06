@@ -17,11 +17,13 @@ import {
   AlertCircle
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/hooks/useI18n";
 
 type TabType = "user" | "developer";
 
 export default function Guide() {
   const [activeTab, setActiveTab] = useState<TabType>("user");
+  const { t } = useI18n();
 
   return (
     <div className="space-y-6">
@@ -29,10 +31,10 @@ export default function Guide() {
       <div className="card-lumina">
         <div className="flex items-center gap-3 mb-2">
           <Book className="w-8 h-8 text-primary" />
-          <h1 className="text-4xl font-bold text-foreground">User Guide</h1>
+          <h1 className="text-4xl font-bold text-foreground">{t('guide.header')}</h1>
         </div>
         <p className="text-muted-foreground">
-          Complete instructions for using the platform and contributing to the project
+          {t('guide.headerDescription')}
         </p>
       </div>
 
@@ -49,7 +51,7 @@ export default function Guide() {
             )}
           >
             <User className="w-4 h-4" />
-            For Users
+            {t('guide.forUsers')}
           </button>
           <button
             onClick={() => setActiveTab("developer")}
@@ -61,7 +63,7 @@ export default function Guide() {
             )}
           >
             <Code className="w-4 h-4" />
-            For Developers
+            {t('guide.forDevelopers')}
           </button>
         </div>
       </div>
@@ -73,27 +75,24 @@ export default function Guide() {
           <div className="card-lumina">
             <div className="flex items-center gap-3 mb-4">
               <Calendar className="w-6 h-6 text-primary" />
-              <h2 className="text-2xl font-bold text-foreground">Dashboard</h2>
+              <h2 className="text-2xl font-bold text-foreground">{t('guide.dashboard.title')}</h2>
             </div>
             
             <div className="space-y-4">
               <p className="text-muted-foreground">
-                The Dashboard is your central hub for monitoring Vietnam stock market performance
-                and key metrics.
+                {t('guide.dashboard.description')}
               </p>
 
               <div className="space-y-3">
-                <h3 className="font-semibold text-foreground">Features:</h3>
+                <h3 className="font-semibold text-foreground">{t('guide.dashboard.features')}</h3>
                 
                 <div className="p-4 bg-secondary/20 rounded-lg">
                   <div className="flex items-start gap-3">
                     <Calendar className="w-5 h-5 text-primary mt-0.5" />
                     <div>
-                      <h4 className="font-medium text-foreground mb-1">Date Picker</h4>
+                      <h4 className="font-medium text-foreground mb-1">{t('guide.dashboard.datePicker.title')}</h4>
                       <p className="text-sm text-muted-foreground">
-                        Select any date to view historical market data. Click the date button in the
-                        top section, choose a date from the calendar, and the dashboard will update
-                        automatically. No date restrictions - explore data from any available period.
+                        {t('guide.dashboard.datePicker.description')}
                       </p>
                     </div>
                   </div>
@@ -103,11 +102,9 @@ export default function Guide() {
                   <div className="flex items-start gap-3">
                     <RefreshCw className="w-5 h-5 text-primary mt-0.5" />
                     <div>
-                      <h4 className="font-medium text-foreground mb-1">Refresh Button</h4>
+                      <h4 className="font-medium text-foreground mb-1">{t('guide.dashboard.refreshButton.title')}</h4>
                       <p className="text-sm text-muted-foreground">
-                        Click the refresh icon to manually reload data. The dashboard no longer
-                        auto-refreshes to prevent unnecessary API calls. Use this when you need
-                        updated information.
+                        {t('guide.dashboard.refreshButton.description')}
                       </p>
                     </div>
                   </div>
@@ -117,11 +114,9 @@ export default function Guide() {
                   <div className="flex items-start gap-3">
                     <Filter className="w-5 h-5 text-primary mt-0.5" />
                     <div>
-                      <h4 className="font-medium text-foreground mb-1">Time Range Filters</h4>
+                      <h4 className="font-medium text-foreground mb-1">{t('guide.dashboard.timeRangeFilters.title')}</h4>
                       <p className="text-sm text-muted-foreground">
-                        Use the 1D, 1W, 1M, 3M, 1Y buttons to quickly jump to common time ranges.
-                        These buttons are located on a separate row below the date picker and refresh
-                        button for easy access.
+                        {t('guide.dashboard.timeRangeFilters.description')}
                       </p>
                     </div>
                   </div>
@@ -134,34 +129,33 @@ export default function Guide() {
           <div className="card-lumina">
             <div className="flex items-center gap-3 mb-4">
               <Search className="w-6 h-6 text-primary" />
-              <h2 className="text-2xl font-bold text-foreground">Asset Finder (Screener)</h2>
+              <h2 className="text-2xl font-bold text-foreground">{t('guide.assetFinder.title')}</h2>
             </div>
             
             <div className="space-y-4">
               <p className="text-muted-foreground">
-                Screen and filter Vietnamese stocks based on various criteria to find investment
-                opportunities.
+                {t('guide.assetFinder.description')}
               </p>
 
               <div className="space-y-3">
-                <h3 className="font-semibold text-foreground">How to Use:</h3>
+                <h3 className="font-semibold text-foreground">{t('guide.assetFinder.howToUse')}</h3>
                 
                 <div className="space-y-2 text-sm text-muted-foreground">
                   <div className="flex items-start gap-2">
                     <CheckCircle className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-                    <span>Use the search bar to filter stocks by symbol or name</span>
+                    <span>{t('guide.assetFinder.tip1')}</span>
                   </div>
                   <div className="flex items-start gap-2">
                     <CheckCircle className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-                    <span>Apply filters for price range, volume, market cap, and performance</span>
+                    <span>{t('guide.assetFinder.tip2')}</span>
                   </div>
                   <div className="flex items-start gap-2">
                     <CheckCircle className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-                    <span>Sort results by clicking column headers</span>
+                    <span>{t('guide.assetFinder.tip3')}</span>
                   </div>
                   <div className="flex items-start gap-2">
                     <CheckCircle className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-                    <span>Click refresh to get the latest stock data</span>
+                    <span>{t('guide.assetFinder.tip4')}</span>
                   </div>
                 </div>
               </div>
@@ -172,50 +166,49 @@ export default function Guide() {
           <div className="card-lumina">
             <div className="flex items-center gap-3 mb-4">
               <MessageSquare className="w-6 h-6 text-primary" />
-              <h2 className="text-2xl font-bold text-foreground">Metallica Chatbot</h2>
+              <h2 className="text-2xl font-bold text-foreground">{t('guide.metallicaChatbot.title')}</h2>
             </div>  
             
             <div className="space-y-4">
               <p className="text-muted-foreground">
-                Ask questions about Vietnamese financial news and get AI-powered insights using
-                our RAG (Retrieval-Augmented Generation) system.
+                {t('guide.metallicaChatbot.description')}
               </p>
 
               <div className="space-y-3">
-                <h3 className="font-semibold text-foreground">Setup:</h3>
+                <h3 className="font-semibold text-foreground">{t('guide.metallicaChatbot.setup')}</h3>
                 
                 <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border-l-4 border-yellow-500 rounded-lg">
                   <div className="flex items-start gap-3">
                     <Key className="w-5 h-5 text-yellow-600 mt-0.5" />
                     <div>
-                      <h4 className="font-medium text-foreground mb-2">Required: Gemini API Key</h4>
+                      <h4 className="font-medium text-foreground mb-2">{t('guide.metallicaChatbot.requiredGeminiKey')}</h4>
                       <ol className="text-sm text-muted-foreground space-y-2 list-decimal list-inside">
-                        <li>Visit <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Google AI Studio</a></li>
-                        <li>Create a free Gemini API key</li>
-                        <li>Enter the key in the chatbot interface</li>
-                        <li>Click "Validate" to activate the chatbot</li>
+                        <li>{t('guide.metallicaChatbot.setupStep1')} <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{t('guide.metallicaChatbot.googleAIStudio')}</a></li>
+                        <li>{t('guide.metallicaChatbot.setupStep2')}</li>
+                        <li>{t('guide.metallicaChatbot.setupStep3')}</li>
+                        <li>{t('guide.metallicaChatbot.setupStep4')}</li>
                       </ol>
                     </div>
                   </div>
                 </div>
 
-                <h3 className="font-semibold text-foreground mt-4">Tips for Best Results:</h3>
+                <h3 className="font-semibold text-foreground mt-4">{t('guide.metallicaChatbot.tipsForBestResults')}</h3>
                 <div className="space-y-2 text-sm text-muted-foreground">
                   <div className="flex items-start gap-2">
                     <CheckCircle className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-                    <span>Ask specific questions about Vietnamese stocks, sectors, or companies</span>
+                    <span>{t('guide.metallicaChatbot.tip1')}</span>
                   </div>
                   <div className="flex items-start gap-2">
                     <CheckCircle className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-                    <span>Questions can be in English or Vietnamese</span>
+                    <span>{t('guide.metallicaChatbot.tip2')}</span>
                   </div>
                   <div className="flex items-start gap-2">
                     <CheckCircle className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-                    <span>The system searches 12,000+ indexed news articles for context</span>
+                    <span>{t('guide.metallicaChatbot.tip3')}</span>
                   </div>
                   <div className="flex items-start gap-2">
                     <CheckCircle className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-                    <span>Response time is typically under 2 seconds</span>
+                    <span>{t('guide.metallicaChatbot.tip4')}</span>
                   </div>
                 </div>
               </div>
@@ -226,40 +219,39 @@ export default function Guide() {
           <div className="card-lumina border-l-4 border-yellow-500">
             <div className="flex items-center gap-3 mb-4">
               <AlertCircle className="w-6 h-6 text-yellow-600" />
-              <h2 className="text-2xl font-bold text-foreground">Demo Features</h2>
+              <h2 className="text-2xl font-bold text-foreground">{t('guide.demoFeatures.title')}</h2>
             </div>
             
             <div className="space-y-4">
               <p className="text-muted-foreground">
-                The following features are currently in demo mode with mock data:
+                {t('guide.demoFeatures.description')}
               </p>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
-                  <h4 className="font-semibold text-foreground mb-2">Market Insights</h4>
+                  <h4 className="font-semibold text-foreground mb-2">{t('guide.demoFeatures.marketInsights.title')}</h4>
                   <p className="text-sm text-muted-foreground">
-                    Shows sample sentiment analysis data for demonstration purposes.
+                    {t('guide.demoFeatures.marketInsights.description')}
                   </p>
                 </div>
 
                 <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
-                  <h4 className="font-semibold text-foreground mb-2">Forecasts</h4>
+                  <h4 className="font-semibold text-foreground mb-2">{t('guide.demoFeatures.forecasts.title')}</h4>
                   <p className="text-sm text-muted-foreground">
-                    Displays mock Vietnam sector performance data (Banking, Real Estate, etc.).
+                    {t('guide.demoFeatures.forecasts.description')}
                   </p>
                 </div>
 
                 <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
-                  <h4 className="font-semibold text-foreground mb-2">Reports</h4>
+                  <h4 className="font-semibold text-foreground mb-2">{t('guide.demoFeatures.reports.title')}</h4>
                   <p className="text-sm text-muted-foreground">
-                    Shows sample reports with disabled generation features.
+                    {t('guide.demoFeatures.reports.description')}
                   </p>
                 </div>
               </div>
 
               <p className="text-sm text-muted-foreground italic">
-                These features are marked with a 🚧 DEMO badge and include development warnings.
-                They will be activated with real data in future releases.
+                {t('guide.demoFeatures.footer')}
               </p>
             </div>
           </div>
@@ -273,39 +265,39 @@ export default function Guide() {
           <div className="card-lumina">
             <div className="flex items-center gap-3 mb-4">
               <Terminal className="w-6 h-6 text-primary" />
-              <h2 className="text-2xl font-bold text-foreground">Project Setup</h2>
+              <h2 className="text-2xl font-bold text-foreground">{t('guide.projectSetup.title')}</h2>
             </div>
             
             <div className="space-y-4">
               <div>
-                <h3 className="font-semibold text-foreground mb-3">Prerequisites</h3>
+                <h3 className="font-semibold text-foreground mb-3">{t('guide.projectSetup.prerequisites')}</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div className="p-3 bg-secondary/20 rounded-lg text-sm">
-                    <div className="font-medium text-foreground">Frontend</div>
-                    <div className="text-muted-foreground">Node.js 18+, npm/yarn</div>
+                    <div className="font-medium text-foreground">{t('guide.projectSetup.frontend')}</div>
+                    <div className="text-muted-foreground">{t('guide.projectSetup.frontendReq')}</div>
                   </div>
                   <div className="p-3 bg-secondary/20 rounded-lg text-sm">
-                    <div className="font-medium text-foreground">Backend</div>
-                    <div className="text-muted-foreground">Python 3.9+, pip</div>
+                    <div className="font-medium text-foreground">{t('guide.projectSetup.backend')}</div>
+                    <div className="text-muted-foreground">{t('guide.projectSetup.backendReq')}</div>
                   </div>
                   <div className="p-3 bg-secondary/20 rounded-lg text-sm">
-                    <div className="font-medium text-foreground">AWS Account</div>
-                    <div className="text-muted-foreground">S3, Glue, Athena access</div>
+                    <div className="font-medium text-foreground">{t('guide.projectSetup.awsAccount')}</div>
+                    <div className="text-muted-foreground">{t('guide.projectSetup.awsReq')}</div>
                   </div>
                   <div className="p-3 bg-secondary/20 rounded-lg text-sm">
-                    <div className="font-medium text-foreground">Gemini API Key</div>
-                    <div className="text-muted-foreground">For chatbot functionality</div>
+                    <div className="font-medium text-foreground">{t('guide.projectSetup.geminiKey')}</div>
+                    <div className="text-muted-foreground">{t('guide.projectSetup.geminiKeyReq')}</div>
                   </div>
                 </div>
               </div>
 
               <div>
-                <h3 className="font-semibold text-foreground mb-3">Installation Steps</h3>
+                <h3 className="font-semibold text-foreground mb-3">{t('guide.projectSetup.installationSteps')}</h3>
                 <div className="space-y-3">
                   <div className="p-4 bg-secondary/10 rounded-lg">
                     <div className="flex items-center gap-2 mb-2">
                       <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-sm font-bold">1</span>
-                      <span className="font-medium text-foreground">Clone Repository</span>
+                      <span className="font-medium text-foreground">{t('guide.projectSetup.cloneRepository')}</span>
                     </div>
                     <code className="block p-2 bg-secondary/30 rounded text-sm text-muted-foreground font-mono">
                       git clone &lt;repository-url&gt;<br/>
@@ -316,7 +308,7 @@ export default function Guide() {
                   <div className="p-4 bg-secondary/10 rounded-lg">
                     <div className="flex items-center gap-2 mb-2">
                       <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-sm font-bold">2</span>
-                      <span className="font-medium text-foreground">Frontend Setup</span>
+                      <span className="font-medium text-foreground">{t('guide.projectSetup.frontendSetup')}</span>
                     </div>
                     <code className="block p-2 bg-secondary/30 rounded text-sm text-muted-foreground font-mono">
                       cd web_executor/frontend<br/>
@@ -328,7 +320,7 @@ export default function Guide() {
                   <div className="p-4 bg-secondary/10 rounded-lg">
                     <div className="flex items-center gap-2 mb-2">
                       <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-sm font-bold">3</span>
-                      <span className="font-medium text-foreground">Backend Setup</span>
+                      <span className="font-medium text-foreground">{t('guide.projectSetup.backendSetup')}</span>
                     </div>
                     <code className="block p-2 bg-secondary/30 rounded text-sm text-muted-foreground font-mono">
                       cd web_executor/backend<br/>
@@ -340,7 +332,7 @@ export default function Guide() {
                   <div className="p-4 bg-secondary/10 rounded-lg">
                     <div className="flex items-center gap-2 mb-2">
                       <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-sm font-bold">4</span>
-                      <span className="font-medium text-foreground">Configure AWS</span>
+                      <span className="font-medium text-foreground">{t('guide.projectSetup.configureAWS')}</span>
                     </div>
                     <code className="block p-2 bg-secondary/30 rounded text-sm text-muted-foreground font-mono">
                       # Set environment variables<br/>
@@ -358,54 +350,54 @@ export default function Guide() {
           <div className="card-lumina">
             <div className="flex items-center gap-3 mb-4">
               <Database className="w-6 h-6 text-primary" />
-              <h2 className="text-2xl font-bold text-foreground">Architecture Overview</h2>
+              <h2 className="text-2xl font-bold text-foreground">{t('guide.architectureOverview.title')}</h2>
             </div>
             
             <div className="space-y-4">
               <p className="text-muted-foreground">
-                Understanding the system architecture is crucial for contributing effectively.
+                {t('guide.architectureOverview.description')}
               </p>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="p-4 bg-secondary/20 rounded-lg">
-                  <h4 className="font-semibold text-foreground mb-2">Bronze Layer</h4>
-                  <p className="text-sm text-muted-foreground mb-2">Raw data ingestion</p>
+                  <h4 className="font-semibold text-foreground mb-2">{t('guide.architectureOverview.bronzeLayer.title')}</h4>
+                  <p className="text-sm text-muted-foreground mb-2">{t('guide.architectureOverview.bronzeLayer.description')}</p>
                   <ul className="text-xs text-muted-foreground space-y-1">
-                    <li>• VNStock API data</li>
-                    <li>• Google CSE news</li>
-                    <li>• Economic indicators</li>
+                    <li>• {t('guide.architectureOverview.bronze1')}</li>
+                    <li>• {t('guide.architectureOverview.bronze2')}</li>
+                    <li>• {t('guide.architectureOverview.bronze3')}</li>
                   </ul>
                 </div>
 
                 <div className="p-4 bg-secondary/20 rounded-lg">
-                  <h4 className="font-semibold text-foreground mb-2">Silver Layer</h4>
-                  <p className="text-sm text-muted-foreground mb-2">Cleaned & enriched</p>
+                  <h4 className="font-semibold text-foreground mb-2">{t('guide.architectureOverview.silverLayer.title')}</h4>
+                  <p className="text-sm text-muted-foreground mb-2">{t('guide.architectureOverview.silverLayer.description')}</p>
                   <ul className="text-xs text-muted-foreground space-y-1">
-                    <li>• Data validation</li>
-                    <li>• Schema normalization</li>
-                    <li>• Quality checks</li>
+                    <li>• {t('guide.architectureOverview.silver1')}</li>
+                    <li>• {t('guide.architectureOverview.silver2')}</li>
+                    <li>• {t('guide.architectureOverview.silver3')}</li>
                   </ul>
                 </div>
 
                 <div className="p-4 bg-secondary/20 rounded-lg">
-                  <h4 className="font-semibold text-foreground mb-2">Gold Layer</h4>
-                  <p className="text-sm text-muted-foreground mb-2">Query-optimized</p>
+                  <h4 className="font-semibold text-foreground mb-2">{t('guide.architectureOverview.goldLayer.title')}</h4>
+                  <p className="text-sm text-muted-foreground mb-2">{t('guide.architectureOverview.goldLayer.description')}</p>
                   <ul className="text-xs text-muted-foreground space-y-1">
-                    <li>• Aggregated metrics</li>
-                    <li>• Business views</li>
-                    <li>• Performance indexes</li>
+                    <li>• {t('guide.architectureOverview.gold1')}</li>
+                    <li>• {t('guide.architectureOverview.gold2')}</li>
+                    <li>• {t('guide.architectureOverview.gold3')}</li>
                   </ul>
                 </div>
               </div>
 
               <div className="p-4 bg-primary/10 rounded-lg border-l-4 border-primary">
-                <h4 className="font-semibold text-foreground mb-2">Key Components</h4>
+                <h4 className="font-semibold text-foreground mb-2">{t('guide.architectureOverview.keyComponents')}</h4>
                 <ul className="text-sm text-muted-foreground space-y-1">
-                  <li>• <strong>Airflow DAGs:</strong> Daily ETL orchestration (09:00 UTC)</li>
-                  <li>• <strong>PySpark Jobs:</strong> Distributed data processing</li>
-                  <li>• <strong>AWS Glue:</strong> Metadata catalog with 9 tables</li>
-                  <li>• <strong>Athena:</strong> SQL-on-S3 query engine</li>
-                  <li>• <strong>FAISS:</strong> Vector search for RAG chatbot</li>
+                  <li>• {t('guide.architectureOverview.airflowDAGs')}</li>
+                  <li>• {t('guide.architectureOverview.pysparkJobs')}</li>
+                  <li>• {t('guide.architectureOverview.awsGlue')}</li>
+                  <li>• {t('guide.architectureOverview.athena')}</li>
+                  <li>• {t('guide.architectureOverview.faiss')}</li>
                 </ul>
               </div>
             </div>
@@ -415,50 +407,50 @@ export default function Guide() {
           <div className="card-lumina">
             <div className="flex items-center gap-3 mb-4">
               <GitBranch className="w-6 h-6 text-primary" />
-              <h2 className="text-2xl font-bold text-foreground">Development Workflow</h2>
+              <h2 className="text-2xl font-bold text-foreground">{t('guide.developmentWorkflow.title')}</h2>
             </div>
             
             <div className="space-y-4">
               <div>
-                <h3 className="font-semibold text-foreground mb-3">Branching Strategy</h3>
+                <h3 className="font-semibold text-foreground mb-3">{t('guide.developmentWorkflow.branchingStrategy')}</h3>
                 <div className="space-y-2 text-sm text-muted-foreground">
                   <div className="flex items-start gap-2">
                     <Code className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-                    <span><code className="text-primary">main</code> - Production-ready code</span>
+                    <span>{t('guide.developmentWorkflow.main')}</span>
                   </div>
                   <div className="flex items-start gap-2">
                     <Code className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-                    <span><code className="text-primary">develop</code> - Integration branch for features</span>
+                    <span>{t('guide.developmentWorkflow.develop')}</span>
                   </div>
                   <div className="flex items-start gap-2">
                     <Code className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-                    <span><code className="text-primary">feature/*</code> - New features or enhancements</span>
+                    <span>{t('guide.developmentWorkflow.feature')}</span>
                   </div>
                   <div className="flex items-start gap-2">
                     <Code className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-                    <span><code className="text-primary">bugfix/*</code> - Bug fixes</span>
+                    <span>{t('guide.developmentWorkflow.bugfix')}</span>
                   </div>
                 </div>
               </div>
 
               <div>
-                <h3 className="font-semibold text-foreground mb-3">Testing Requirements</h3>
+                <h3 className="font-semibold text-foreground mb-3">{t('guide.developmentWorkflow.testingRequirements')}</h3>
                 <div className="space-y-2 text-sm text-muted-foreground">
                   <div className="flex items-start gap-2">
                     <CheckCircle className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-                    <span>Write unit tests for all new features</span>
+                    <span>{t('guide.developmentWorkflow.test1')}</span>
                   </div>
                   <div className="flex items-start gap-2">
                     <CheckCircle className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-                    <span>Ensure integration tests pass before PR</span>
+                    <span>{t('guide.developmentWorkflow.test2')}</span>
                   </div>
                   <div className="flex items-start gap-2">
                     <CheckCircle className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-                    <span>Test locally with sample data</span>
+                    <span>{t('guide.developmentWorkflow.test3')}</span>
                   </div>
                   <div className="flex items-start gap-2">
                     <CheckCircle className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-                    <span>Verify TypeScript types (no <code>any</code> types)</span>
+                    <span>{t('guide.developmentWorkflow.test4')}</span>
                   </div>
                 </div>
               </div>
@@ -469,7 +461,7 @@ export default function Guide() {
           <div className="card-lumina border-l-4 border-primary">
             <div className="flex items-center gap-3 mb-4">
               <PlayCircle className="w-6 h-6 text-primary" />
-              <h2 className="text-2xl font-bold text-foreground">How to Contribute</h2>
+              <h2 className="text-2xl font-bold text-foreground">{t('guide.howToContribute.title')}</h2>
             </div>
             
             <div className="space-y-4">
@@ -477,48 +469,48 @@ export default function Guide() {
                 <li className="flex items-start gap-3">
                   <span className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary font-bold flex-shrink-0">1</span>
                   <div>
-                    <div className="font-medium text-foreground">Fork & Clone</div>
-                    <div className="text-sm">Fork the repository and clone it to your local machine</div>
+                    <div className="font-medium text-foreground">{t('guide.howToContribute.step1.title')}</div>
+                    <div className="text-sm">{t('guide.howToContribute.step1.description')}</div>
                   </div>
                 </li>
                 <li className="flex items-start gap-3">
                   <span className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary font-bold flex-shrink-0">2</span>
                   <div>
-                    <div className="font-medium text-foreground">Create Branch</div>
-                    <div className="text-sm">Create a new branch following naming conventions: <code className="text-primary">feature/your-feature-name</code></div>
+                    <div className="font-medium text-foreground">{t('guide.howToContribute.step2.title')}</div>
+                    <div className="text-sm">{t('guide.howToContribute.step2.description')}</div>
                   </div>
                 </li>
                 <li className="flex items-start gap-3">
                   <span className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary font-bold flex-shrink-0">3</span>
                   <div>
-                    <div className="font-medium text-foreground">Make Changes</div>
-                    <div className="text-sm">Implement your feature with clean, documented code</div>
+                    <div className="font-medium text-foreground">{t('guide.howToContribute.step3.title')}</div>
+                    <div className="text-sm">{t('guide.howToContribute.step3.description')}</div>
                   </div>
                 </li>
                 <li className="flex items-start gap-3">
                   <span className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary font-bold flex-shrink-0">4</span>
                   <div>
-                    <div className="font-medium text-foreground">Test Thoroughly</div>
-                    <div className="text-sm">Write and run tests to ensure everything works</div>
+                    <div className="font-medium text-foreground">{t('guide.howToContribute.step4.title')}</div>
+                    <div className="text-sm">{t('guide.howToContribute.step4.description')}</div>
                   </div>
                 </li>
                 <li className="flex items-start gap-3">
                   <span className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary font-bold flex-shrink-0">5</span>
                   <div>
-                    <div className="font-medium text-foreground">Submit PR</div>
-                    <div className="text-sm">Create a pull request with a clear description of changes</div>
+                    <div className="font-medium text-foreground">{t('guide.howToContribute.step5.title')}</div>
+                    <div className="text-sm">{t('guide.howToContribute.step5.description')}</div>
                   </div>
                 </li>
               </ol>
 
               <div className="p-4 bg-primary/10 rounded-lg mt-4">
-                <h4 className="font-semibold text-foreground mb-2">Code Style Guidelines</h4>
+                <h4 className="font-semibold text-foreground mb-2">{t('guide.howToContribute.codeStyleGuidelines')}</h4>
                 <ul className="text-sm text-muted-foreground space-y-1">
-                  <li>• Follow TypeScript/Python best practices</li>
-                  <li>• Use meaningful variable and function names</li>
-                  <li>• Add comments for complex logic</li>
-                  <li>• Keep functions small and focused</li>
-                  <li>• Run linters before committing (ESLint, Black)</li>
+                  <li>• {t('guide.howToContribute.guideline1')}</li>
+                  <li>• {t('guide.howToContribute.guideline2')}</li>
+                  <li>• {t('guide.howToContribute.guideline3')}</li>
+                  <li>• {t('guide.howToContribute.guideline4')}</li>
+                  <li>• {t('guide.howToContribute.guideline5')}</li>
                 </ul>
               </div>
             </div>
@@ -528,28 +520,28 @@ export default function Guide() {
           <div className="card-lumina">
             <div className="flex items-center gap-3 mb-4">
               <Book className="w-6 h-6 text-primary" />
-              <h2 className="text-2xl font-bold text-foreground">Useful Resources</h2>
+              <h2 className="text-2xl font-bold text-foreground">{t('guide.usefulResources.title')}</h2>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <a href="/about" className="p-4 bg-secondary/20 rounded-lg hover:bg-secondary/30 transition-colors">
-                <h4 className="font-semibold text-foreground mb-1">Project Documentation</h4>
-                <p className="text-sm text-muted-foreground">Learn about the project architecture and goals</p>
+                <h4 className="font-semibold text-foreground mb-1">{t('guide.usefulResources.projectDocumentation.title')}</h4>
+                <p className="text-sm text-muted-foreground">{t('guide.usefulResources.projectDocumentation.description')}</p>
               </a>
               
               <a href="https://docs.aws.amazon.com/athena/" target="_blank" rel="noopener noreferrer" className="p-4 bg-secondary/20 rounded-lg hover:bg-secondary/30 transition-colors">
-                <h4 className="font-semibold text-foreground mb-1">AWS Athena Docs</h4>
-                <p className="text-sm text-muted-foreground">Query language and optimization guides</p>
+                <h4 className="font-semibold text-foreground mb-1">{t('guide.usefulResources.awsAthenaDocs.title')}</h4>
+                <p className="text-sm text-muted-foreground">{t('guide.usefulResources.awsAthenaDocs.description')}</p>
               </a>
               
               <a href="https://spark.apache.org/docs/latest/api/python/" target="_blank" rel="noopener noreferrer" className="p-4 bg-secondary/20 rounded-lg hover:bg-secondary/30 transition-colors">
-                <h4 className="font-semibold text-foreground mb-1">PySpark API</h4>
-                <p className="text-sm text-muted-foreground">Reference for data processing jobs</p>
+                <h4 className="font-semibold text-foreground mb-1">{t('guide.usefulResources.pysparkAPI.title')}</h4>
+                <p className="text-sm text-muted-foreground">{t('guide.usefulResources.pysparkAPI.description')}</p>
               </a>
               
               <a href="https://react.dev/" target="_blank" rel="noopener noreferrer" className="p-4 bg-secondary/20 rounded-lg hover:bg-secondary/30 transition-colors">
-                <h4 className="font-semibold text-foreground mb-1">React Documentation</h4>
-                <p className="text-sm text-muted-foreground">Frontend framework reference</p>
+                <h4 className="font-semibold text-foreground mb-1">{t('guide.usefulResources.reactDocumentation.title')}</h4>
+                <p className="text-sm text-muted-foreground">{t('guide.usefulResources.reactDocumentation.description')}</p>
               </a>
             </div>
           </div>

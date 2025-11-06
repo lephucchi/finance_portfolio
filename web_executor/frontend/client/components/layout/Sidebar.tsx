@@ -22,13 +22,13 @@ interface SidebarProps {
 }
 
 const MENU_ITEMS = [
-  { id: "home", label: "Home", icon: Home, path: "/", badge: null },
-  { id: "chat", label: "Metallica", icon: MessageSquare, path: "/chat", badge: null },
-  { id: "dashboard", label: "Dashboard", icon: BarChart3, path: "/dashboard", badge: null },
-  { id: "screener", label: "Asset Finder", icon: BarChart2, path: "/screener", badge: null },
-  { id: "news", label: "Insights", icon: FileText, path: "/news", badge: "DEMO" },
-  { id: "trends", label: "Forecasts", icon: TrendingUp, path: "/trends", badge: "DEMO" },
-  { id: "reports", label: "Reports", icon: Zap, path: "/reports", badge: "DEMO" },
+  { id: "home", label: "Home", icon: Home, path: "/", badge: null, useAvatar: false },
+  { id: "chat", label: "Metallica", icon: MessageSquare, path: "/chat", badge: null, useAvatar: true },
+  { id: "dashboard", label: "Dashboard", icon: BarChart3, path: "/dashboard", badge: null, useAvatar: false },
+  { id: "screener", label: "Asset Finder", icon: BarChart2, path: "/screener", badge: null, useAvatar: false },
+  { id: "news", label: "Insights", icon: FileText, path: "/news", badge: "DEMO", useAvatar: false },
+  { id: "trends", label: "Forecasts", icon: TrendingUp, path: "/trends", badge: "DEMO", useAvatar: false },
+  { id: "reports", label: "Reports", icon: Zap, path: "/reports", badge: "DEMO", useAvatar: false },
 ];
 
 const INFO_ITEMS = [
@@ -81,7 +81,18 @@ export default function Sidebar({
                     : "text-sidebar-foreground hover:bg-secondary/50",
                 )}
               >
-                <Icon className="w-5 h-5 flex-shrink-0" />
+                {/* Use avatar for Metallica, icon for others */}
+                {item.useAvatar ? (
+                  <div className="w-5 h-5 rounded-full overflow-hidden bg-primary/10 flex-shrink-0">
+                    <img 
+                      src="/Metallica_the_Gardian.png" 
+                      alt="Metallica" 
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                ) : (
+                  <Icon className="w-5 h-5 flex-shrink-0" />
+                )}
                 {!collapsed && (
                   <div className="flex items-center justify-between flex-1">
                     <span className="text-sm font-medium">{item.label}</span>

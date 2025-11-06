@@ -209,8 +209,12 @@ export default function Chat() {
       {/* Header */}
       <div className="card-lumina m-6 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-            <Eye className="w-5 h-5 text-primary" />
+          <div className="w-10 h-10 rounded-full overflow-hidden bg-primary/10 flex items-center justify-center">
+            <img 
+              src="/Metallica_the_Gardian.png" 
+              alt="Metallica Avatar" 
+              className="w-full h-full object-cover"
+            />
           </div>
           <div>
             <h1 className="text-2xl font-bold text-foreground">
@@ -323,8 +327,19 @@ export default function Chat() {
         {messages.map((message) => (
           <div
             key={message.id}
-            className={`flex ${message.role === "user" ? "justify-end" : "justify-start"} fade-in-scale`}
+            className={`flex ${message.role === "user" ? "justify-end" : "justify-start gap-3"} fade-in-scale`}
           >
+            {/* Bot Avatar */}
+            {message.role === "oracle" && (
+              <div className="flex-shrink-0 w-8 h-8 rounded-full overflow-hidden bg-primary/10 flex items-center justify-center">
+                <img 
+                  src="/Metallica_the_Gardian.png" 
+                  alt="Metallica" 
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            )}
+            
             <div className="max-w-2xl">
               <div
                 className={`inline-block max-w-md rounded-lg px-4 py-2 ${

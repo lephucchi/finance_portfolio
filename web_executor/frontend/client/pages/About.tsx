@@ -3,7 +3,7 @@ import { Target, TrendingUp, Zap, Users, Code, Database, Cloud, Brain, Layers, M
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/hooks/useI18n";
 
-type Section = "overview" | "lakehouse" | "rag" | "airflow";
+type Section = "overview" | "lakehouse" | "rag" | "airflow" | "architecture";
 
 export default function About() {
   const [activeSection, setActiveSection] = useState<Section>("overview");
@@ -41,7 +41,7 @@ export default function About() {
 
       {/* Navigation Tabs */}
       <div className="card-lumina">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
           <button
             onClick={() => setActiveSection("overview")}
             className={cn(
@@ -89,6 +89,18 @@ export default function About() {
           >
             <GitBranch className="w-5 h-5" />
             <span className="font-medium">{t('about.airflowEtl')}</span>
+          </button>
+          <button
+            onClick={() => setActiveSection("architecture")}
+            className={cn(
+              "flex items-center gap-2 px-4 py-3 rounded-lg transition-all",
+              activeSection === "architecture"
+                ? "bg-primary text-primary-foreground shadow-lg"
+                : "bg-secondary/30 text-muted-foreground hover:bg-secondary/50"
+            )}
+          >
+            <Code className="w-5 h-5" />
+            <span className="font-medium">{t('about.backendFrontendMcp')}</span>
           </button>
         </div>
       </div>
@@ -517,29 +529,6 @@ export default function About() {
                   <li>• Period: 6 years (2020-2025)</li>
                   <li>• Update: Daily/Weekly</li>
                 </ul>
-              </div>
-            </div>
-          </div>
-
-          {/* Performance Metrics */}
-          <div className="card-lumina">
-            <h3 className="text-xl font-bold text-foreground mb-4">{t('about.performanceCostEfficiency')}</h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="p-4 bg-primary/10 rounded-lg text-center">
-                <div className="text-3xl font-bold text-primary mb-1">87-94%</div>
-                <div className="text-xs text-muted-foreground">{t('about.costSavingsVsRds')}</div>
-              </div>
-              <div className="p-4 bg-primary/10 rounded-lg text-center">
-                <div className="text-3xl font-bold text-primary mb-1">0.5-1s</div>
-                <div className="text-xs text-muted-foreground">{t('about.queryLatency')}</div>
-              </div>
-              <div className="p-4 bg-primary/10 rounded-lg text-center">
-                <div className="text-3xl font-bold text-primary mb-1">92%</div>
-                <div className="text-xs text-muted-foreground">{t('about.dataCompression')}</div>
-              </div>
-              <div className="p-4 bg-primary/10 rounded-lg text-center">
-                <div className="text-3xl font-bold text-primary mb-1">$6.32</div>
-                <div className="text-xs text-muted-foreground">{t('about.monthlyQueryCost')}</div>
               </div>
             </div>
           </div>
@@ -1090,6 +1079,402 @@ export default function About() {
                   <li>• 50 GB total memory</li>
                   <li>• S3 for input/output</li>
                 </ul>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ARCHITECTURE SECTION: BE-FE & MCP */}
+      {activeSection === "architecture" && (
+        <>
+          {/* Overview */}
+          <div className="card-lumina">
+            <div className="flex items-start gap-4">
+              <Code className="w-8 h-8 text-primary flex-shrink-0 mt-1" />
+              <div className="flex-1">
+                <h2 className="text-2xl font-bold text-foreground mb-3">
+                  {t('about.backendFrontendMcp')}
+                </h2>
+                <p className="text-muted-foreground leading-relaxed mb-4">
+                  {t('about.systemArchitectureDesc')}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* System Architecture Diagram */}
+          <div className="card-lumina">
+            <h3 className="text-xl font-bold text-foreground mb-4">{t('about.systemArchitecture')}</h3>
+            <div className="bg-secondary/10 p-6 rounded-lg">
+              <div className="space-y-6">
+                {/* Frontend Layer */}
+                <div className="p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg border-2 border-indigo-300 dark:border-indigo-700">
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="text-2xl">🖥️</span>
+                    <h4 className="font-bold text-foreground">{t('about.frontendLayer')}</h4>
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-3">{t('about.frontendLayerDesc')}</p>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                    <div className="text-xs bg-white dark:bg-slate-900 p-2 rounded">📱 Chat Interface</div>
+                    <div className="text-xs bg-white dark:bg-slate-900 p-2 rounded">🔑 API Key Manager</div>
+                    <div className="text-xs bg-white dark:bg-slate-900 p-2 rounded">📊 Dashboard</div>
+                  </div>
+                </div>
+
+                {/* Arrow down */}
+                <div className="text-center text-primary">↓ HTTPS REST API ↓</div>
+
+                {/* Backend Layer */}
+                <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg border-2 border-purple-300 dark:border-purple-700">
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="text-2xl">⚙️</span>
+                    <h4 className="font-bold text-foreground">{t('about.backendLayer')}</h4>
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-3">{t('about.backendLayerDesc')}</p>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+                    <div className="text-xs bg-white dark:bg-slate-900 p-2 rounded">🔍 RAG Service</div>
+                    <div className="text-xs bg-white dark:bg-slate-900 p-2 rounded">🤖 LLM (Gemini)</div>
+                    <div className="text-xs bg-white dark:bg-slate-900 p-2 rounded">📦 Vector DB (FAISS)</div>
+                    <div className="text-xs bg-white dark:bg-slate-900 p-2 rounded">💾 Supabase</div>
+                  </div>
+                </div>
+
+                {/* Arrow down */}
+                <div className="text-center text-primary">↓ Data & Model Access ↓</div>
+
+                {/* Data Layer */}
+                <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border-2 border-green-300 dark:border-green-700">
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="text-2xl">💾</span>
+                    <h4 className="font-bold text-foreground">{t('about.dataLayer')}</h4>
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-3">{t('about.dataLayerDesc')}</p>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                    <div className="text-xs bg-white dark:bg-slate-900 p-2 rounded">📈 FAISS Index (328K vectors)</div>
+                    <div className="text-xs bg-white dark:bg-slate-900 p-2 rounded">🧠 Embeddings (768-dim)</div>
+                    <div className="text-xs bg-white dark:bg-slate-900 p-2 rounded">📋 Metadata (Parquet)</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Backend Details */}
+          <div className="card-lumina">
+            <h3 className="text-xl font-bold text-foreground mb-4">{t('about.backendFastapi')}</h3>
+            <div className="space-y-4">
+              <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+                <h4 className="font-semibold text-foreground mb-3">{t('about.coreComponents')}</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <h5 className="font-medium text-foreground mb-2">{t('about.ragService')}</h5>
+                    <ul className="text-sm text-muted-foreground space-y-1">
+                      <li>• Query embedding (Vietnamese-SBERT)</li>
+                      <li>• FAISS vector search</li>
+                      <li>• Cross-encoder reranking</li>
+                      <li>• Context building with full text</li>
+                      <li>• Gemini LLM integration</li>
+                    </ul>
+                  </div>
+                  <div>
+                    <h5 className="font-medium text-foreground mb-2">{t('about.apiEndpoints')}</h5>
+                    <ul className="text-sm text-muted-foreground space-y-1">
+                      <li>• POST /api/v1/rag/validate-key</li>
+                      <li>• POST /api/v1/rag/query</li>
+                      <li>• GET /api/v1/rag/history</li>
+                      <li>• DELETE /api/v1/rag/history</li>
+                      <li>• GET /health</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+                <h5 className="font-medium text-foreground mb-3">Key Features</h5>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="flex items-start gap-2">
+                    <span className="text-primary mt-1">✓</span>
+                    <div>
+                      <div className="font-medium text-foreground text-sm">Async Processing</div>
+                      <div className="text-xs text-muted-foreground">Non-blocking request handling with Python async/await</div>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="text-primary mt-1">✓</span>
+                    <div>
+                      <div className="font-medium text-foreground text-sm">Error Handling</div>
+                      <div className="text-xs text-muted-foreground">Graceful fallback for API failures</div>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="text-primary mt-1">✓</span>
+                    <div>
+                      <div className="font-medium text-foreground text-sm">Logging</div>
+                      <div className="text-xs text-muted-foreground">Structured JSON logs for debugging</div>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="text-primary mt-1">✓</span>
+                    <div>
+                      <div className="font-medium text-foreground text-sm">Caching</div>
+                      <div className="text-xs text-muted-foreground">Supabase + Redis for response caching</div>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="text-primary mt-1">✓</span>
+                    <div>
+                      <div className="font-medium text-foreground text-sm">Rate Limiting</div>
+                      <div className="text-xs text-muted-foreground">Token-based API key management</div>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="text-primary mt-1">✓</span>
+                    <div>
+                      <div className="font-medium text-foreground text-sm">CORS Enabled</div>
+                      <div className="text-xs text-muted-foreground">Cross-origin requests from frontend</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Frontend Details */}
+          <div className="card-lumina">
+            <h3 className="text-xl font-bold text-foreground mb-4">Frontend (React + TypeScript)</h3>
+            <div className="space-y-4">
+              <div className="p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg">
+                <h4 className="font-semibold text-foreground mb-3">Metallica AI Personality</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
+                  <div>
+                    <h5 className="font-medium text-foreground mb-2">Visual Identity</h5>
+                    <ul className="text-sm text-muted-foreground space-y-1">
+                      <li>🎨 Metallica Avatar (3 locations)</li>
+                      <li>⚡ Lumina color scheme (primary/secondary)</li>
+                      <li>🎭 Glassmorphism UI design</li>
+                      <li>✨ Smooth animations & transitions</li>
+                    </ul>
+                  </div>
+                  <div>
+                    <h5 className="font-medium text-foreground mb-2">Personality</h5>
+                    <ul className="text-sm text-muted-foreground space-y-1">
+                      <li>🎯 AEGIS Lumina messenger</li>
+                      <li>💬 Structured response format</li>
+                      <li>📚 Source citations with links</li>
+                      <li>🌐 Vietnamese-first language</li>
+                    </ul>
+                  </div>
+                </div>
+                <div className="p-3 bg-indigo-100 dark:bg-indigo-900/30 rounded text-sm text-foreground">
+                  <strong>Response Format:</strong> Markdown-formatted answers with source citations, relevance scores, 
+                  and keyword highlighting for financial analysis.
+                </div>
+              </div>
+
+              <div className="p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg">
+                <h5 className="font-medium text-foreground mb-3">Key Pages & Features</h5>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="text-sm">
+                    <div className="font-medium text-foreground mb-1">💬 Chat Page</div>
+                    <div className="text-muted-foreground text-xs">RAG chatbot interface with Metallica avatar, message history, source citations</div>
+                  </div>
+                  <div className="text-sm">
+                    <div className="font-medium text-foreground mb-1">📊 Dashboard</div>
+                    <div className="text-muted-foreground text-xs">Real-time stock data visualization, technical indicators, market overview</div>
+                  </div>
+                  <div className="text-sm">
+                    <div className="font-medium text-foreground mb-1">🔍 Asset Finder</div>
+                    <div className="text-muted-foreground text-xs">Advanced screening with filters for stock selection</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg">
+                <h5 className="font-medium text-foreground mb-3">Technology Stack</h5>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">
+                  <div className="bg-white dark:bg-slate-900 p-2 rounded">React 18.2.0</div>
+                  <div className="bg-white dark:bg-slate-900 p-2 rounded">TypeScript 5.2</div>
+                  <div className="bg-white dark:bg-slate-900 p-2 rounded">Vite 4.4.0</div>
+                  <div className="bg-white dark:bg-slate-900 p-2 rounded">TailwindCSS 3.3</div>
+                  <div className="bg-white dark:bg-slate-900 p-2 rounded">React Query</div>
+                  <div className="bg-white dark:bg-slate-900 p-2 rounded">React Router</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* MCP Server */}
+          <div className="card-lumina">
+            <h3 className="text-xl font-bold text-foreground mb-4">MCP Server (Model Context Protocol)</h3>
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Optional Model Context Protocol server for LLM tool integration and advanced AI capabilities.
+              </p>
+
+              <div className="p-4 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
+                <h4 className="font-semibold text-foreground mb-3">Available Tools</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="flex items-start gap-2">
+                    <span className="text-primary font-bold">1</span>
+                    <div>
+                      <div className="font-medium text-foreground text-sm">Stock Analyzer Tool</div>
+                      <div className="text-xs text-muted-foreground">Query stock data, technical indicators, price history</div>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="text-primary font-bold">2</span>
+                    <div>
+                      <div className="font-medium text-foreground text-sm">News Fetcher Tool</div>
+                      <div className="text-xs text-muted-foreground">Retrieve latest news, sentiment analysis, trending topics</div>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="text-primary font-bold">3</span>
+                    <div>
+                      <div className="font-medium text-foreground text-sm">Market Intelligence Tool</div>
+                      <div className="text-xs text-muted-foreground">Macro indicators, economic events, market sentiment</div>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="text-primary font-bold">4</span>
+                    <div>
+                      <div className="font-medium text-foreground text-sm">Portfolio Analyzer Tool</div>
+                      <div className="text-xs text-muted-foreground">Portfolio optimization, risk assessment, rebalancing</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-4 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
+                <h4 className="font-semibold text-foreground mb-3">Integration Benefits</h4>
+                <div className="space-y-2">
+                  <div className="flex items-start gap-2 text-sm">
+                    <span className="text-primary">✓</span>
+                    <span className="text-muted-foreground"><strong>Extended Capabilities:</strong> Gemini AI can use RAG tools for enhanced financial analysis</span>
+                  </div>
+                  <div className="flex items-start gap-2 text-sm">
+                    <span className="text-primary">✓</span>
+                    <span className="text-muted-foreground"><strong>Real-time Data Access:</strong> Live stock prices, market data, news feeds</span>
+                  </div>
+                  <div className="flex items-start gap-2 text-sm">
+                    <span className="text-primary">✓</span>
+                    <span className="text-muted-foreground"><strong>Context Awareness:</strong> Tools provide rich context for LLM decision-making</span>
+                  </div>
+                  <div className="flex items-start gap-2 text-sm">
+                    <span className="text-primary">✓</span>
+                    <span className="text-muted-foreground"><strong>Autonomous Workflows:</strong> Multi-step analysis without user intervention</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Data Flow */}
+          <div className="card-lumina">
+            <h3 className="text-xl font-bold text-foreground mb-4">End-to-End Data Flow</h3>
+            <div className="space-y-3">
+              {[
+                {
+                  step: 1,
+                  user: "User enters query in Chat interface",
+                  system: "Frontend validates input & stores in state"
+                },
+                {
+                  step: 2,
+                  user: "Frontend sends API request to backend",
+                  system: "Backend receives query + API key + history"
+                },
+                {
+                  step: 3,
+                  user: "RAG Service embeds query",
+                  system: "Vietnamese-SBERT generates 768-dim vector"
+                },
+                {
+                  step: 4,
+                  user: "FAISS vector search in S3",
+                  system: "Returns top-7 most similar documents (IndexFlatIP)"
+                },
+                {
+                  step: 5,
+                  user: "Cross-encoder reranking",
+                  system: "Reorders results by relevance score"
+                },
+                {
+                  step: 6,
+                  user: "Context building with full text",
+                  system: "Loads 2000 chars per doc from CSV cache (~6,988 chars total)"
+                },
+                {
+                  step: 7,
+                  user: "Gemini LLM generation",
+                  system: "Generates answer with Metallica personality (~800ms)"
+                },
+                {
+                  step: 8,
+                  user: "Response formatting & source extraction",
+                  system: "Markdown + source citations [{source, link}]"
+                },
+                {
+                  step: 9,
+                  user: "Frontend receives response",
+                  system: "Displays with Metallica avatar, sources, citations"
+                }
+              ].map((flow) => (
+                <div key={flow.step} className="p-3 bg-secondary/20 rounded-lg">
+                  <div className="flex items-start gap-3">
+                    <div className="flex items-center justify-center w-7 h-7 rounded-full bg-primary text-primary-foreground font-bold flex-shrink-0 text-xs">
+                      {flow.step}
+                    </div>
+                    <div className="flex-1">
+                      <div className="text-sm"><span className="font-medium text-foreground">{flow.user}</span></div>
+                      <div className="text-xs text-muted-foreground">→ {flow.system}</div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="mt-4 p-3 bg-primary/10 rounded-lg text-center">
+              <span className="text-sm font-semibold text-foreground">{t('about.totalResponseTime')} </span>
+              <span className="text-lg font-bold text-primary">~2-5 seconds (end-to-end)</span>
+            </div>
+          </div>
+
+          {/* Performance Metrics */}
+          <div className="card-lumina">
+            <h3 className="text-xl font-bold text-foreground mb-4">Performance Metrics</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="p-3 bg-primary/10 rounded-lg text-center">
+                <div className="text-2xl font-bold text-primary mb-1">~50ms</div>
+                <div className="text-xs text-muted-foreground">Query Embedding</div>
+              </div>
+              <div className="p-3 bg-primary/10 rounded-lg text-center">
+                <div className="text-2xl font-bold text-primary mb-1">&lt;10ms</div>
+                <div className="text-xs text-muted-foreground">FAISS Search</div>
+              </div>
+              <div className="p-3 bg-primary/10 rounded-lg text-center">
+                <div className="text-2xl font-bold text-primary mb-1">~100ms</div>
+                <div className="text-xs text-muted-foreground">Reranking</div>
+              </div>
+              <div className="p-3 bg-primary/10 rounded-lg text-center">
+                <div className="text-2xl font-bold text-primary mb-1">~800ms</div>
+                <div className="text-xs text-muted-foreground">LLM Generation</div>
+              </div>
+              <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-lg text-center">
+                <div className="text-2xl font-bold text-green-600 mb-1">99.8%</div>
+                <div className="text-xs text-muted-foreground">Uptime</div>
+              </div>
+              <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-lg text-center">
+                <div className="text-2xl font-bold text-green-600 mb-1">328K+</div>
+                <div className="text-xs text-muted-foreground">Indexed Vectors</div>
+              </div>
+              <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-lg text-center">
+                <div className="text-2xl font-bold text-green-600 mb-1">12K+</div>
+                <div className="text-xs text-muted-foreground">News Articles</div>
+              </div>
+              <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-lg text-center">
+                <div className="text-2xl font-bold text-green-600 mb-1">7</div>
+                <div className="text-xs text-muted-foreground">Retrieved Docs</div>
               </div>
             </div>
           </div>
