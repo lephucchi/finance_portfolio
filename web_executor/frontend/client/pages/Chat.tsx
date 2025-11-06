@@ -53,13 +53,22 @@ export default function Chat() {
     }
   }, []);
 
+  // Scroll to top when component mounts
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, []);
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
+  // Only scroll to bottom when user sends a new message
   useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+    // Only auto-scroll if there's more than 1 message (initial greeting)
+    if (messages.length > 1) {
+      scrollToBottom();
+    }
+  }, [messages.length]);
 
   const validateApiKey = async (keyToValidate?: string) => {
     const key = keyToValidate || apiKey;

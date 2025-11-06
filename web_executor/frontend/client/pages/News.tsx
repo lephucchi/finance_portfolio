@@ -1,8 +1,74 @@
 import { useState, useEffect } from "react";
-import { FileText, TrendingUp, AlertCircle, Loader } from "lucide-react";
+import { FileText, TrendingUp, AlertCircle, Loader, RefreshCw, Construction } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { api, getDateRange, DATA_START_DATE, DATA_END_DATE } from "@/lib/api";
-import type { SentimentSummary, SentimentOverall } from "@/lib/api";
+
+// Mock data for demo
+const MOCK_SENTIMENT_DATA = {
+  summary: [
+    {
+      date: "2025-10-17",
+      total_articles: 45,
+      avg_sentiment: 0.42,
+      positive_pct: 58.5,
+      negative_pct: 23.2,
+      neutral_pct: 18.3,
+      positive_count: 26,
+      negative_count: 11,
+      neutral_count: 8
+    },
+    {
+      date: "2025-10-16",
+      total_articles: 52,
+      avg_sentiment: 0.35,
+      positive_pct: 54.2,
+      negative_pct: 28.1,
+      neutral_pct: 17.7,
+      positive_count: 28,
+      negative_count: 15,
+      neutral_count: 9
+    },
+    {
+      date: "2025-10-15",
+      total_articles: 38,
+      avg_sentiment: -0.15,
+      positive_pct: 35.8,
+      negative_pct: 42.5,
+      neutral_pct: 21.7,
+      positive_count: 14,
+      negative_count: 16,
+      neutral_count: 8
+    },
+    {
+      date: "2025-10-14",
+      total_articles: 41,
+      avg_sentiment: 0.28,
+      positive_pct: 51.3,
+      negative_pct: 31.2,
+      neutral_pct: 17.5,
+      positive_count: 21,
+      negative_count: 13,
+      neutral_count: 7
+    },
+    {
+      date: "2025-10-13",
+      total_articles: 49,
+      avg_sentiment: 0.48,
+      positive_pct: 62.1,
+      negative_pct: 20.3,
+      neutral_pct: 17.6,
+      positive_count: 30,
+      negative_count: 10,
+      neutral_count: 9
+    },
+  ],
+  overall: {
+    total_articles: 225,
+    avg_sentiment: 0.33,
+    positive_pct: 52.4,
+    negative_pct: 29.1,
+    neutral_pct: 18.5
+  }
+};
 
 function LoadingSpinner() {
   return (
@@ -20,6 +86,24 @@ function ErrorAlert({ message }: { message: string }) {
         <div>
           <h3 className="font-semibold text-foreground">Error Loading Data</h3>
           <p className="text-sm text-muted-foreground mt-1">{message}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DevelopmentWarning() {
+  return (
+    <div className="card-lumina border-l-4 border-yellow-500 bg-yellow-50">
+      <div className="flex gap-3">
+        <Construction className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+        <div>
+          <h3 className="font-semibold text-yellow-900 flex items-center gap-2">
+            🚧 Under Development - Demo Data Only
+          </h3>
+          <p className="text-sm text-yellow-800 mt-1">
+            This feature is currently under development. All data shown below is simulated for demonstration purposes and does not reflect real market sentiment or news analysis.
+          </p>
         </div>
       </div>
     </div>
@@ -46,35 +130,35 @@ function SentimentBadge({ sentiment }: { sentiment: number }) {
 }
 
 export default function News() {
-  const [sentimentSummary, setSentimentSummary] = useState<SentimentSummary[]>(
-    [],
-  );
-  const [sentimentOverall, setSentimentOverall] =
-    useState<SentimentOverall | null>(null);
+  const [sentimentSummary, setSentimentSummary] = useState<any[]>([]);
+  const [sentimentOverall, setSentimentOverall] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const loadSentiment = async () => {
+    try {
+      setLoading(true);
+
+      // Simulate API delay
+      await new Promise(resolve => setTimeout(resolve, 800));
+
+      // Load mock data
+      setSentimentSummary(MOCK_SENTIMENT_DATA.summary);
+      setSentimentOverall(MOCK_SENTIMENT_DATA.overall);
+    } catch (err) {
+      console.error("Error loading mock data:", err);
+    } finally {
+      setLoading(false);
+      setIsRefreshing(false);
+    }
+  };
+
+  const handleRefresh = () => {
+    setIsRefreshing(true);
+    loadSentiment();
+  };
 
   useEffect(() => {
-    async function loadSentiment() {
-      try {
-        setLoading(true);
-        setError(null);
-
-        // Use available data range: Oct 18-30, 2025 (13 days)
-        const result = await api.getSentimentSummary(DATA_START_DATE, DATA_END_DATE);
-
-        setSentimentSummary(result.summary);
-        setSentimentOverall(result.overall);
-      } catch (err) {
-        const message =
-          err instanceof Error ? err.message : "Failed to load sentiment data";
-        setError(message);
-        console.error("Sentiment error:", err);
-      } finally {
-        setLoading(false);
-      }
-    }
-
     loadSentiment();
   }, []);
 
@@ -82,47 +166,76 @@ export default function News() {
     return (
       <div className="space-y-6">
         <div className="card-lumina">
-          <h1 className="text-3xl font-bold text-foreground">
-            Market Insights
-          </h1>
-          <p className="text-sm text-muted-foreground mt-2">
-            News sentiment analysis and financial intelligence
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-foreground">
+                Market Insights
+              </h1>
+              <p className="text-sm text-muted-foreground mt-2">
+                News sentiment analysis and financial intelligence
+              </p>
+            </div>
+            <button
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              className={cn(
+                "px-4 py-2 rounded-lg transition-all duration-300 text-sm font-medium flex items-center gap-2",
+                "bg-secondary/50 text-foreground hover:bg-secondary",
+                isRefreshing && "opacity-50 cursor-not-allowed"
+              )}
+            >
+              <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
+              Refresh
+            </button>
+          </div>
         </div>
         <LoadingSpinner />
       </div>
     );
   }
 
-  if (error) {
-    return (
-      <div className="space-y-6">
-        <div className="card-lumina">
-          <h1 className="text-3xl font-bold text-foreground">
-            Market Insights
-          </h1>
-          <p className="text-sm text-muted-foreground mt-2">
-            News sentiment analysis and financial intelligence
-          </p>
-        </div>
-        <ErrorAlert message={error} />
-      </div>
-    );
-  }
-
-  const recentSentiment = sentimentSummary[sentimentSummary.length - 1];
+  const recentSentiment = sentimentSummary && sentimentSummary.length > 0 
+    ? sentimentSummary[sentimentSummary.length - 1] 
+    : null;
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="card-lumina">
-        <h1 className="text-3xl font-bold text-foreground">Market Insights</h1>
-        <p className="text-sm text-muted-foreground mt-2">
-          News sentiment analysis and financial intelligence
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="flex items-center gap-3">
+              <h1 className="text-3xl font-bold text-foreground">
+                Market Insights
+              </h1>
+              <span className="px-3 py-1 bg-yellow-100 text-yellow-800 text-xs font-semibold rounded-full border border-yellow-300">
+                🚧 DEMO
+              </span>
+            </div>
+            <p className="text-sm text-muted-foreground mt-2">
+              News sentiment analysis and financial intelligence (Demo Version)
+            </p>
+          </div>
+          <button
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className={cn(
+              "px-4 py-2 rounded-lg transition-all duration-300 text-sm font-medium flex items-center gap-2",
+              "bg-secondary/50 text-foreground hover:bg-secondary",
+              isRefreshing && "opacity-50 cursor-not-allowed"
+            )}
+          >
+            <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
+            Refresh
+          </button>
+        </div>
       </div>
 
+      {/* Development Warning */}
+      <DevelopmentWarning />
+
       {/* Stats */}
-      {sentimentOverall && (
+      {sentimentOverall && sentimentSummary && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="card-lumina">
             <p className="text-xs text-muted-foreground font-medium mb-2">
@@ -291,6 +404,29 @@ export default function News() {
             <p className="text-xs text-muted-foreground">
               Bearish sentiment with negative coverage
             </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Demo Disclaimer Footer */}
+      <div className="card-lumina border-2 border-yellow-300 bg-yellow-50/50">
+        <div className="flex gap-3">
+          <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+          <div>
+            <h3 className="font-semibold text-yellow-900 mb-2">
+              📊 Demo Data Notice
+            </h3>
+            <p className="text-sm text-yellow-800 mb-2">
+              <strong>Important:</strong> This Market Insights feature is currently in development. 
+              All sentiment scores, article counts, and trends displayed above are simulated data 
+              for demonstration purposes only.
+            </p>
+            <ul className="text-xs text-yellow-700 space-y-1 list-disc list-inside">
+              <li>No real news sources are being analyzed</li>
+              <li>Sentiment scores are randomly generated</li>
+              <li>Data does not reflect actual market conditions</li>
+              <li>Do not use this information for investment decisions</li>
+            </ul>
           </div>
         </div>
       </div>

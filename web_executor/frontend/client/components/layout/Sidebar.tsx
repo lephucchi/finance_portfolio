@@ -18,12 +18,12 @@ interface SidebarProps {
 }
 
 const MENU_ITEMS = [
-  { id: "dashboard", label: "Dashboard", icon: BarChart3, path: "/" },
-  { id: "screener", label: "Asset Finder", icon: BarChart2, path: "/screener" },
-  { id: "news", label: "Insights", icon: FileText, path: "/news" },
-  { id: "trends", label: "Forecasts", icon: TrendingUp, path: "/trends" },
-  { id: "reports", label: "Reports", icon: Zap, path: "/reports" },
-  { id: "chat", label: "Oracle", icon: MessageSquare, path: "/chat" },
+  { id: "chat", label: "Metallica", icon: MessageSquare, path: "/chat", badge: null },
+  { id: "dashboard", label: "Dashboard", icon: BarChart3, path: "/", badge: null },
+  { id: "screener", label: "Asset Finder", icon: BarChart2, path: "/screener", badge: null },
+  { id: "news", label: "Insights", icon: FileText, path: "/news", badge: "DEMO" },
+  { id: "trends", label: "Forecasts", icon: TrendingUp, path: "/trends", badge: "DEMO" },
+  { id: "reports", label: "Reports", icon: Zap, path: "/reports", badge: "DEMO" },
 ];
 
 export default function Sidebar({
@@ -72,7 +72,14 @@ export default function Sidebar({
               >
                 <Icon className="w-5 h-5 flex-shrink-0" />
                 {!collapsed && (
-                  <span className="text-sm font-medium">{item.label}</span>
+                  <div className="flex items-center justify-between flex-1">
+                    <span className="text-sm font-medium">{item.label}</span>
+                    {item.badge && (
+                      <span className="px-2 py-0.5 text-[10px] font-bold bg-yellow-100 text-yellow-800 rounded border border-yellow-300">
+                        {item.badge}
+                      </span>
+                    )}
+                  </div>
                 )}
               </button>
             );

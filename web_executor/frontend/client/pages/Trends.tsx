@@ -5,10 +5,78 @@ import {
   Loader,
   Award,
   TrendingDown,
+  RefreshCw,
+  Construction,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { api, getDateRange } from "@/lib/api";
-import type { SectorPerformance } from "@/lib/api";
+
+// Mock data for demo - Vietnam stock market sectors
+const MOCK_SECTOR_DATA = [
+  {
+    sector: "Banking",
+    avg_change_pct: 2.45,
+    stock_count: 28,
+    total_volume: 1250000000,
+    top_gainers: ["VCB", "TCB", "MBB"],
+    top_losers: ["STB", "VPB"]
+  },
+  {
+    sector: "Real Estate",
+    avg_change_pct: 1.85,
+    stock_count: 35,
+    total_volume: 980000000,
+    top_gainers: ["VHM", "NVL", "VIC"],
+    top_losers: ["PDR", "DXG"]
+  },
+  {
+    sector: "Securities",
+    avg_change_pct: 3.12,
+    stock_count: 18,
+    total_volume: 650000000,
+    top_gainers: ["SSI", "VCI", "HCM"],
+    top_losers: ["VND", "FTS"]
+  },
+  {
+    sector: "Manufacturing",
+    avg_change_pct: -0.75,
+    stock_count: 42,
+    total_volume: 1100000000,
+    top_gainers: ["HPG", "HSG", "NKG"],
+    top_losers: ["TLG", "DCM", "DGC"]
+  },
+  {
+    sector: "Technology",
+    avg_change_pct: 4.28,
+    stock_count: 15,
+    total_volume: 420000000,
+    top_gainers: ["FPT", "CMG", "VGI"],
+    top_losers: ["SAM", "ELC"]
+  },
+  {
+    sector: "Retail",
+    avg_change_pct: 1.15,
+    stock_count: 22,
+    total_volume: 580000000,
+    top_gainers: ["MWG", "FRT", "PNJ"],
+    top_losers: ["VHC", "DGW"]
+  },
+  {
+    sector: "Energy",
+    avg_change_pct: -1.45,
+    stock_count: 20,
+    total_volume: 890000000,
+    top_gainers: ["PVD", "PVS"],
+    top_losers: ["POW", "GAS", "PLX"]
+  },
+  {
+    sector: "Food & Beverage",
+    avg_change_pct: 0.85,
+    stock_count: 25,
+    total_volume: 340000000,
+    top_gainers: ["VNM", "MSN", "SAB"],
+    top_losers: ["VHC", "QNS"]
+  }
+];
 
 function LoadingSpinner() {
   return (
@@ -32,7 +100,27 @@ function ErrorAlert({ message }: { message: string }) {
   );
 }
 
-function SectorCard({ sector }: { sector: SectorPerformance }) {
+function DevelopmentWarning() {
+  return (
+    <div className="card-lumina border-l-4 border-yellow-500 bg-yellow-50">
+      <div className="flex gap-3">
+        <Construction className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+        <div>
+          <h3 className="font-semibold text-yellow-900 flex items-center gap-2">
+            🚧 Under Development - Demo Data Only
+          </h3>
+          <p className="text-sm text-yellow-800 mt-1">
+            This Forecasts feature is currently under development. All sector performance data, 
+            predictions, and analytics shown below are simulated for demonstration purposes and 
+            do not reflect actual market conditions.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SectorCard({ sector }: { sector: typeof MOCK_SECTOR_DATA[0] }) {
   const isPositive = sector.avg_change_pct >= 0;
   const Icon = isPositive ? TrendingUp : TrendingDown;
 
@@ -100,33 +188,39 @@ function SectorCard({ sector }: { sector: SectorPerformance }) {
 }
 
 export default function Trends() {
-  const [sectors, setSectors] = useState<SectorPerformance[]>([]);
+  const [sectors, setSectors] = useState<typeof MOCK_SECTOR_DATA>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const loadSectors = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Simulate API delay
+      await new Promise(resolve => setTimeout(resolve, 800));
+
+      // Load mock data
+      const sortedData = [...MOCK_SECTOR_DATA].sort(
+        (a, b) => b.avg_change_pct - a.avg_change_pct,
+      );
+      setSectors(sortedData);
+    } catch (err) {
+      console.error("Error loading mock sector data:", err);
+      setError("Failed to load sector data");
+    } finally {
+      setLoading(false);
+      setIsRefreshing(false);
+    }
+  };
+
+  const handleRefresh = () => {
+    setIsRefreshing(true);
+    loadSectors();
+  };
 
   useEffect(() => {
-    async function loadSectors() {
-      try {
-        setLoading(true);
-        setError(null);
-
-        const { startDate, endDate } = getDateRange(1);
-        const data = await api.getSectorPerformance(startDate, endDate);
-
-        const sortedData = [...data].sort(
-          (a, b) => b.avg_change_pct - a.avg_change_pct,
-        );
-        setSectors(sortedData);
-      } catch (err) {
-        const message =
-          err instanceof Error ? err.message : "Failed to load sector data";
-        setError(message);
-        console.error("Trends error:", err);
-      } finally {
-        setLoading(false);
-      }
-    }
-
     loadSectors();
   }, []);
 
@@ -134,10 +228,31 @@ export default function Trends() {
     return (
       <div className="space-y-6">
         <div className="card-lumina">
-          <h1 className="text-3xl font-bold text-foreground">Forecasts</h1>
-          <p className="text-sm text-muted-foreground mt-2">
-            AI-powered trend analysis and sector predictions
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="flex items-center gap-3">
+                <h1 className="text-3xl font-bold text-foreground">Forecasts</h1>
+                <span className="px-3 py-1 bg-yellow-100 text-yellow-800 text-xs font-semibold rounded-full border border-yellow-300">
+                  🚧 DEMO
+                </span>
+              </div>
+              <p className="text-sm text-muted-foreground mt-2">
+                AI-powered trend analysis and sector predictions (Demo Version)
+              </p>
+            </div>
+            <button
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              className={cn(
+                "px-4 py-2 rounded-lg transition-all duration-300 text-sm font-medium flex items-center gap-2",
+                "bg-secondary/50 text-foreground hover:bg-secondary",
+                isRefreshing && "opacity-50 cursor-not-allowed"
+              )}
+            >
+              <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
+              Refresh
+            </button>
+          </div>
         </div>
         <LoadingSpinner />
       </div>
@@ -148,10 +263,31 @@ export default function Trends() {
     return (
       <div className="space-y-6">
         <div className="card-lumina">
-          <h1 className="text-3xl font-bold text-foreground">Forecasts</h1>
-          <p className="text-sm text-muted-foreground mt-2">
-            AI-powered trend analysis and sector predictions
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="flex items-center gap-3">
+                <h1 className="text-3xl font-bold text-foreground">Forecasts</h1>
+                <span className="px-3 py-1 bg-yellow-100 text-yellow-800 text-xs font-semibold rounded-full border border-yellow-300">
+                  🚧 DEMO
+                </span>
+              </div>
+              <p className="text-sm text-muted-foreground mt-2">
+                AI-powered trend analysis and sector predictions (Demo Version)
+              </p>
+            </div>
+            <button
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              className={cn(
+                "px-4 py-2 rounded-lg transition-all duration-300 text-sm font-medium flex items-center gap-2",
+                "bg-secondary/50 text-foreground hover:bg-secondary",
+                isRefreshing && "opacity-50 cursor-not-allowed"
+              )}
+            >
+              <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
+              Refresh
+            </button>
+          </div>
         </div>
         <ErrorAlert message={error} />
       </div>
@@ -168,12 +304,37 @@ export default function Trends() {
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="card-lumina">
-        <h1 className="text-3xl font-bold text-foreground">Forecasts</h1>
-        <p className="text-sm text-muted-foreground mt-2">
-          AI-powered trend analysis and sector predictions
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="flex items-center gap-3">
+              <h1 className="text-3xl font-bold text-foreground">Forecasts</h1>
+              <span className="px-3 py-1 bg-yellow-100 text-yellow-800 text-xs font-semibold rounded-full border border-yellow-300">
+                🚧 DEMO
+              </span>
+            </div>
+            <p className="text-sm text-muted-foreground mt-2">
+              AI-powered trend analysis and sector predictions (Demo Version)
+            </p>
+          </div>
+          <button
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className={cn(
+              "px-4 py-2 rounded-lg transition-all duration-300 text-sm font-medium flex items-center gap-2",
+              "bg-secondary/50 text-foreground hover:bg-secondary",
+              isRefreshing && "opacity-50 cursor-not-allowed"
+            )}
+          >
+            <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
+            Refresh
+          </button>
+        </div>
       </div>
+
+      {/* Development Warning */}
+      <DevelopmentWarning />
 
       {/* Summary Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -360,6 +521,29 @@ export default function Trends() {
               ))}
             </tbody>
           </table>
+        </div>
+      </div>
+
+      {/* Demo Disclaimer Footer */}
+      <div className="card-lumina border-2 border-yellow-300 bg-yellow-50/50">
+        <div className="flex gap-3">
+          <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+          <div>
+            <h3 className="font-semibold text-yellow-900 mb-2">
+              📊 Demo Data Notice
+            </h3>
+            <p className="text-sm text-yellow-800 mb-2">
+              <strong>Important:</strong> This Forecasts feature is currently in development. 
+              All sector performance data, trends, and analytics displayed above are simulated data 
+              for demonstration purposes only.
+            </p>
+            <ul className="text-xs text-yellow-700 space-y-1 list-disc list-inside">
+              <li>Sector performance metrics are randomly generated</li>
+              <li>Stock symbols and volumes do not reflect real market data</li>
+              <li>Predictions and trends are for UI demonstration only</li>
+              <li>Do not use this information for investment decisions</li>
+            </ul>
+          </div>
         </div>
       </div>
     </div>

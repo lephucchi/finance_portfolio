@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { BarChart2, Zap, AlertCircle, Loader } from "lucide-react";
+import { BarChart2, Zap, AlertCircle, Loader, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api, getDateRange, formatCurrency, formatPercent } from "@/lib/api";
 import type { StockData } from "@/lib/api";
@@ -31,6 +31,7 @@ export default function Screener() {
   const [filteredStocks, setFilteredStocks] = useState<StockData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [filters, setFilters] = useState({
     searchSymbol: "",
     minChange: "",
@@ -38,28 +39,35 @@ export default function Screener() {
     minVolume: "",
   });
 
-  useEffect(() => {
-    async function loadStocks() {
-      try {
-        setLoading(true);
-        setError(null);
+  const loadStocks = async () => {
+    try {
+      setLoading(true);
+      setError(null);
 
-        const { startDate, endDate } = getDateRange(1);
-        const data = await api.getStocks(startDate, endDate);
+      const { startDate, endDate } = getDateRange(1);
+      const data = await api.getStocks(startDate, endDate);
 
-        setStocks(data);
-        setFilteredStocks(data);
-      } catch (err) {
-        const message =
-          err instanceof Error ? err.message : "Failed to load stock data";
-        setError(message);
-        console.error("Screener error:", err);
-      } finally {
-        setLoading(false);
-      }
+      setStocks(data);
+      setFilteredStocks(data);
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Failed to load stock data";
+      setError(message);
+      console.error("Screener error:", err);
+    } finally {
+      setLoading(false);
+      setIsRefreshing(false);
     }
+  };
 
+  const handleRefresh = () => {
+    setIsRefreshing(true);
     loadStocks();
+  };
+
+  useEffect(() => {
+    loadStocks();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -109,10 +117,26 @@ export default function Screener() {
     return (
       <div className="space-y-6">
         <div className="card-lumina">
-          <h1 className="text-3xl font-bold text-foreground">Asset Finder</h1>
-          <p className="text-sm text-muted-foreground mt-2">
-            Discover stocks matching your criteria
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-foreground">Asset Finder</h1>
+              <p className="text-sm text-muted-foreground mt-2">
+                Discover stocks matching your criteria
+              </p>
+            </div>
+            <button
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              className={cn(
+                "px-4 py-2 rounded-lg transition-all duration-300 text-sm font-medium flex items-center gap-2",
+                "bg-secondary/50 text-foreground hover:bg-secondary",
+                isRefreshing && "opacity-50 cursor-not-allowed"
+              )}
+            >
+              <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
+              Refresh
+            </button>
+          </div>
         </div>
         <LoadingSpinner />
       </div>
@@ -123,10 +147,26 @@ export default function Screener() {
     return (
       <div className="space-y-6">
         <div className="card-lumina">
-          <h1 className="text-3xl font-bold text-foreground">Asset Finder</h1>
-          <p className="text-sm text-muted-foreground mt-2">
-            Discover stocks matching your criteria
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-foreground">Asset Finder</h1>
+              <p className="text-sm text-muted-foreground mt-2">
+                Discover stocks matching your criteria
+              </p>
+            </div>
+            <button
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              className={cn(
+                "px-4 py-2 rounded-lg transition-all duration-300 text-sm font-medium flex items-center gap-2",
+                "bg-secondary/50 text-foreground hover:bg-secondary",
+                isRefreshing && "opacity-50 cursor-not-allowed"
+              )}
+            >
+              <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
+              Refresh
+            </button>
+          </div>
         </div>
         <ErrorAlert message={error} />
       </div>
@@ -136,10 +176,26 @@ export default function Screener() {
   return (
     <div className="space-y-6">
       <div className="card-lumina">
-        <h1 className="text-3xl font-bold text-foreground">Asset Finder</h1>
-        <p className="text-sm text-muted-foreground mt-2">
-          Discover stocks matching your criteria
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-foreground">Asset Finder</h1>
+            <p className="text-sm text-muted-foreground mt-2">
+              Discover stocks matching your criteria
+            </p>
+          </div>
+          <button
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className={cn(
+              "px-4 py-2 rounded-lg transition-all duration-300 text-sm font-medium flex items-center gap-2",
+              "bg-secondary/50 text-foreground hover:bg-secondary",
+              isRefreshing && "opacity-50 cursor-not-allowed"
+            )}
+          >
+            <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
+            Refresh
+          </button>
+        </div>
       </div>
 
       {/* Filters */}

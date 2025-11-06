@@ -56,21 +56,30 @@ class MarketService:
             # Build query
             sql = self._build_market_query(start_date, end_date, symbols)
 
-            # Check cache
-            query_hash = self._hash_query(sql)
-            cached = self.supabase.get_cached_result(query_hash)
-            if cached:
-                logger.info("Returning cached market data")
-                return cached["result"]
+            # TODO: Cache disabled until Supabase cache tables are verified
+            # Supabase cache layer may not be fully initialized
+            # Restore these lines once tables are set up:
+            # query_hash = self._hash_query(sql)
+            # cached = self.supabase.get_cached_result(query_hash)
+            # if cached:
+            #     logger.info("Returning cached market data")
+            #     return cached["result"]
 
-            # Execute query
+            # Execute query directly
             logger.info(f"Fetching market data from {start_date} to {end_date}")
             logger.info(f"SQL Query: {sql}")
             results = self.athena.query(sql)
+            
+            if not results:
+                logger.warning(f"No data found for date range {start_date} to {end_date}")
+                return []
+            
             logger.info(f"Query returned {len(results)} rows")
 
-            # Cache results
-            self.supabase.cache_result(query_hash, sql, results)
+            # TODO: Cache results when Supabase is available
+            # Restore this when cache is ready:
+            # query_hash = self._hash_query(sql)
+            # self.supabase.cache_result(query_hash, sql, results)
 
             return results
 

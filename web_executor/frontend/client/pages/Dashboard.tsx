@@ -6,9 +6,15 @@ import {
   Zap,
   AlertCircle,
   Loader,
+  Calendar,
+  RefreshCw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { api, getDateRange, formatCurrency, formatPercent, DATA_END_DATE } from "@/lib/api";
+import {
+  api,
+  formatCurrency,
+  formatPercent,
+} from "@/lib/api";
 import type { DashboardSummary, StockData } from "@/lib/api";
 
 function SmoothLineChart({ data }: { data: StockData[] }) {
@@ -129,41 +135,55 @@ function ErrorAlert({ message }: { message: string }) {
 
 export default function Dashboard() {
   const [timeFrame, setTimeFrame] = useState("1d");
+  const [selectedDate, setSelectedDate] = useState("2025-10-17"); // Latest available date
   const [dashboardData, setDashboardData] = useState<DashboardSummary | null>(
     null,
   );
   const [stocksData, setStocksData] = useState<StockData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const loadDashboard = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Calculate date range for chart (5 days before selected date)
+      const selectedDateObj = new Date(selectedDate);
+      const startDateObj = new Date(selectedDateObj);
+      startDateObj.setDate(startDateObj.getDate() - 5);
+      
+      const startDate = startDateObj.toISOString().split('T')[0];
+      const endDate = selectedDate;
+
+      const [dashboard, stocks] = await Promise.all([
+        api.getDashboardSummary(selectedDate),
+        api.getStocks(startDate, endDate),
+      ]);
+
+      setDashboardData(dashboard);
+      setStocksData(stocks);
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Failed to load dashboard data";
+      setError(message);
+      console.error("Dashboard error:", err);
+    } finally {
+      setLoading(false);
+      setIsRefreshing(false);
+    }
+  };
+
+  const handleRefresh = () => {
+    setIsRefreshing(true);
+    loadDashboard();
+  };
 
   useEffect(() => {
-    async function loadDashboard() {
-      try {
-        setLoading(true);
-        setError(null);
-
-        // Use latest available data (Oct 30, 2025)
-        const { startDate, endDate } = getDateRange(5);
-
-        const [dashboard, stocks] = await Promise.all([
-          api.getDashboardSummary(DATA_END_DATE),
-          api.getStocks(startDate, endDate),
-        ]);
-
-        setDashboardData(dashboard);
-        setStocksData(stocks);
-      } catch (err) {
-        const message =
-          err instanceof Error ? err.message : "Failed to load dashboard data";
-        setError(message);
-        console.error("Dashboard error:", err);
-      } finally {
-        setLoading(false);
-      }
-    }
-
     loadDashboard();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDate]); // Only reload when date changes, NOT on mount
 
   if (loading) {
     return (
@@ -200,14 +220,47 @@ export default function Dashboard() {
     <div className="space-y-6">
       {/* Header Section */}
       <div className="card-lumina">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
-            <p className="text-sm text-muted-foreground mt-2">
-              Real-time market insights and analytics
-            </p>
+        <div className="flex flex-col gap-4">
+          {/* Title and Controls Row */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
+              <p className="text-sm text-muted-foreground mt-2">
+                Real-time market insights and analytics
+              </p>
+            </div>
+
+            <div className="flex gap-2 items-center flex-wrap">
+              {/* Date Picker */}
+              <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-lg shadow-sm border border-gray-200">
+                <Calendar className="h-4 w-4 text-gray-500" />
+                <input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  className="text-sm font-medium text-gray-700 border-none focus:outline-none focus:ring-2 focus:ring-blue-500 rounded"
+                  title="Select any date to view historical data"
+                />
+              </div>
+
+              {/* Refresh Button */}
+              <button
+                onClick={handleRefresh}
+                disabled={isRefreshing}
+                className={cn(
+                  "px-4 py-2 rounded-lg transition-all duration-300 text-sm font-medium flex items-center gap-2",
+                  "bg-secondary/50 text-foreground hover:bg-secondary",
+                  isRefreshing && "opacity-50 cursor-not-allowed"
+                )}
+                title="Refresh data"
+              >
+                <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
+                Refresh
+              </button>
+            </div>
           </div>
 
+          {/* Time Frame Buttons Row */}
           <div className="flex gap-2">
             {["1H", "1D", "1W", "1M"].map((tf) => (
               <button
@@ -258,7 +311,7 @@ export default function Dashboard() {
           ].map((metric, idx) => {
             const Icon = metric.positive ? TrendingUp : TrendingDown;
             return (
-              <div key={idx} className="card-lumina hover:shadow-lg">
+              <div key={metric.label} className="card-lumina hover:shadow-lg">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs text-muted-foreground font-medium mb-2">
@@ -368,7 +421,7 @@ export default function Dashboard() {
                 `Volume strength: ${((dashboardData.market.total_volume ?? 0) / 1000000000).toFixed(1)}B shares`,
               ].map((insight, i) => (
                 <div
-                  key={i}
+                  key={`insight-${i}`}
                   className="p-3 rounded-lg bg-secondary/30 border-l-2 border-primary/50"
                 >
                   <p className="text-xs text-foreground leading-relaxed">
