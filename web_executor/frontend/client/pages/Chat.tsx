@@ -87,6 +87,7 @@ export default function Chat() {
       // console.log(`[RAG] Validating API key (length: ${key.length})...`);
       const startTime = Date.now();
       
+      // Use full API path with /v1/ prefix
       const response = await fetch("/api/v1/rag/validate-key", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -98,13 +99,13 @@ export default function Chat() {
       // console.log(`[RAG] Response received in ${elapsed}ms, status: ${response.status}`);
 
       const data = await response.json();
-      console.log(`[RAG] Validation result:`, data);
+      // console.log(`[RAG] Validation result:`, data);
       
       setApiKeyValid(data.valid);
 
       if (data.valid) {
         localStorage.setItem("gemini_api_key", key);
-        console.log(`[RAG] API key saved to localStorage`);
+        // console.log(`[RAG] API key saved to localStorage`);
       }
     } catch (error) {
       if (error.name === 'AbortError') {
@@ -142,7 +143,7 @@ export default function Chat() {
     setIsLoading(true);
 
     try {
-      // Use RAG endpoint instead of /api/ai/chat
+      // Use RAG endpoint with full /api/v1/ path
       const response = await fetch("/api/v1/rag/query", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

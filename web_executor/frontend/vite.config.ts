@@ -10,7 +10,8 @@ export default defineConfig(({ mode }) => ({
     port: parseInt(process.env.VITE_PORT || "5173"),
     proxy: {
       '/api': {
-        target: process.env.VITE_API_BASE_URL || 'http://localhost:8000',
+        // Extract base URL without /api/v1 suffix for proxy
+        target: process.env.VITE_BACKEND_URL || 'http://localhost:8000',
         changeOrigin: true,
         secure: false,
         timeout: 30000, // 30 seconds timeout
