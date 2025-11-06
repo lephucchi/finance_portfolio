@@ -21,6 +21,12 @@ PROJECT_DIR="/home/ubuntu/finance_portfolio"
 BACKUP_DIR="/home/ubuntu/backups"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 
+# Service URLs - Use environment variables or container names in docker-compose
+# In production with docker-compose, use service names
+# For standalone, use localhost:port
+BACKEND_HEALTH_URL="${BACKEND_HEALTH_URL:-http://localhost:8000/health}"
+FRONTEND_URL="${FRONTEND_URL:-http://localhost:5173}"
+
 # =============================================================================
 # Helper Functions
 # =============================================================================
@@ -171,7 +177,7 @@ wait_for_services() {
     local attempt=0
     
     while [ $attempt -lt $max_attempts ]; do
-        if curl -f http://localhost:8000/health > /dev/null 2>&1; then
+        if curl -f "$BACKEND_HEALTH_URL" > /dev/null 2>&1; then
             print_success "Backend is healthy"
             break
         fi
@@ -188,7 +194,7 @@ wait_for_services() {
     # Check frontend
     attempt=0
     while [ $attempt -lt $max_attempts ]; do
-        if curl -f http://localhost:5173 > /dev/null 2>&1; then
+        if curl -f "$FRONTEND_URL" > /dev/null 2>&1; then
             print_success "Frontend is healthy"
             break
         fi
@@ -231,11 +237,18 @@ display_status() {
     echo -e "${GREEN}Services Status:${NC}"
     docker-compose ps
     
-    echo -e "\n${GREEN}Access URLs:${NC}"
-    echo "  Frontend:    http://$(curl -s ifconfig.me):5173"
-    echo "  Backend API: http://$(curl -s ifconfig.me):8000"
-    echo "  API Docs:    http://$(curl -s ifconfig.me):8000/docs"
-    echo "  Airflow:     http://$(curl -s ifconfig.me):8080"
+    echo -e "\n${GREEN}Service URLs:${NC}"
+    echo "  Backend Health:  $BACKEND_HEALTH_URL"
+    echo "  Frontend:        $FRONTEND_URL"
+    
+    # Get public IP if available
+    PUBLIC_IP=$(curl -s ifconfig.me 2>/dev/null || echo "YOUR_SERVER_IP")
+    
+    echo -e "\n${GREEN}Access URLs (replace YOUR_SERVER_IP with your EC2 public IP):${NC}"
+    echo "  Frontend:    http://$PUBLIC_IP:5173"
+    echo "  Backend API: http://$PUBLIC_IP:8000"
+    echo "  API Docs:    http://$PUBLIC_IP:8000/docs"
+    echo "  Airflow:     http://$PUBLIC_IP:8080"
     
     echo -e "\n${GREEN}Useful Commands:${NC}"
     echo "  View logs:       docker-compose logs -f"

@@ -289,7 +289,8 @@ SUPABASE_KEY=your_supabase_key
 GEMINI_API_KEY=your_gemini_api_key
 
 # Frontend Configuration
-VITE_API_BASE_URL=http://localhost:8000/api/v1
+# Update this to your domain/IP in production
+VITE_API_BASE_URL=${VITE_API_BASE_URL:-http://localhost:8000/api/v1}
 
 # Database
 POSTGRES_USER=airflow

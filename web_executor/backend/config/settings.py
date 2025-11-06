@@ -27,12 +27,22 @@ class Settings(BaseSettings):
     # API CONFIGURATION
     # ========================
     API_V1_STR: str = "/api/v1"
+    # CORS allowed origins - supports development and production URLs
+    # Development: http://localhost:3000,http://localhost:5173,http://localhost:8000
+    # Production: Should be set via environment variable
     ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:5173,http://localhost:8000"
     
     @property
     def allowed_origins_list(self) -> list[str]:
         """Parse ALLOWED_ORIGINS string into list."""
-        return [origin.strip() for origin in self.ALLOWED_ORIGINS.split(",")]
+        origins = [origin.strip() for origin in self.ALLOWED_ORIGINS.split(",")]
+        # Log allowed origins for debugging
+        import sys
+        if 'pytest' not in sys.modules:  # Don't log during tests
+            from app.core.config import get_logger
+            logger = get_logger(__name__)
+            logger.info(f"CORS allowed origins: {origins}")
+        return origins
 
     # ========================
     # AWS CONFIGURATION

@@ -84,7 +84,7 @@ export default function Chat() {
     const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
     
     try {
-      console.log(`[RAG] Validating API key (length: ${key.length})...`);
+      // console.log(`[RAG] Validating API key (length: ${key.length})...`);
       const startTime = Date.now();
       
       const response = await fetch("/api/v1/rag/validate-key", {
@@ -95,7 +95,7 @@ export default function Chat() {
       });
 
       const elapsed = Date.now() - startTime;
-      console.log(`[RAG] Response received in ${elapsed}ms, status: ${response.status}`);
+      // console.log(`[RAG] Response received in ${elapsed}ms, status: ${response.status}`);
 
       const data = await response.json();
       console.log(`[RAG] Validation result:`, data);

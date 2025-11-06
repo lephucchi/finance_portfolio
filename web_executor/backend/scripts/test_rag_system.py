@@ -278,15 +278,19 @@ class RAGSystemTester:
         
         try:
             import httpx
+            import os
+            
+            # Get API URL from environment or use default
+            api_base_url = os.getenv('API_BASE_URL', 'http://localhost:8000')
             
             try:
                 # Test if backend is running
-                response = httpx.get("http://localhost:8000/", timeout=5)
+                response = httpx.get(f"{api_base_url}/", timeout=5)
                 if response.status_code == 200:
-                    print(f"  ✓ Backend API is running")
+                    print(f"  ✓ Backend API is running at {api_base_url}")
                     
                     # Try health check endpoint
-                    response = httpx.get("http://localhost:8000/api/v1/rag/health", timeout=5)
+                    response = httpx.get(f"{api_base_url}/api/v1/rag/health", timeout=5)
                     if response.status_code == 200:
                         health = response.json()
                         status = health.get("status", "unknown")

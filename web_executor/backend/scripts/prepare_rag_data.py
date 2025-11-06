@@ -180,7 +180,8 @@ if dest_files:
     print("   1. Update .env file with correct paths")
     print("   2. Install dependencies: pip install -r requirements.txt")
     print("   3. Start backend: python main.py")
-    print("   4. Test RAG endpoint: GET http://localhost:8000/api/v1/rag/stats")
+    print("   4. Test RAG endpoint: GET {API_URL}/api/v1/rag/stats")
+    print(f"      (default: http://localhost:8000/api/v1/rag/stats)")
 else:
     print("\n❌ No files were created. Check the source directory and try again.")
 

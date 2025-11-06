@@ -19,6 +19,11 @@ LOG_FILE="/home/ubuntu/finance_portfolio/logs/monitor.log"
 ALERT_EMAIL="admin@example.com"
 PROJECT_DIR="/home/ubuntu/finance_portfolio"
 
+# Service URLs - Use environment variables or defaults
+BACKEND_URL="${BACKEND_URL:-http://localhost:8000/health}"
+FRONTEND_URL="${FRONTEND_URL:-http://localhost:5173}"
+AIRFLOW_URL="${AIRFLOW_URL:-http://localhost:8080/health}"
+
 # Timestamp
 TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
 
@@ -55,15 +60,15 @@ echo "Time: $TIMESTAMP"
 echo ""
 
 # Backend API
-check_service "Backend API" "http://localhost:8000/health"
+check_service "Backend API" "$BACKEND_URL"
 BACKEND_STATUS=$?
 
 # Frontend
-check_service "Frontend" "http://localhost:5173"
+check_service "Frontend" "$FRONTEND_URL"
 FRONTEND_STATUS=$?
 
 # Airflow Webserver
-check_service "Airflow Web" "http://localhost:8080/health"
+check_service "Airflow Web" "$AIRFLOW_URL"
 AIRFLOW_STATUS=$?
 
 # =============================================================================
@@ -173,6 +178,11 @@ else
     echo -e "${RED}❌ AWS S3: Connection failed${NC}"
     log "❌ AWS S3: Connection failed"
 fi
+
+echo -e "\n${GREEN}=== Service Configuration ===${NC}"
+echo "Backend URL: $BACKEND_URL"
+echo "Frontend URL: $FRONTEND_URL"
+echo "Airflow URL: $AIRFLOW_URL"
 
 # =============================================================================
 # Recent Errors
