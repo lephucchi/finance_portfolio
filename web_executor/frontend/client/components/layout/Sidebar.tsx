@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
+  Home,
   BarChart3,
   TrendingUp,
   FileText,
@@ -21,8 +22,9 @@ interface SidebarProps {
 }
 
 const MENU_ITEMS = [
+  { id: "home", label: "Home", icon: Home, path: "/", badge: null },
   { id: "chat", label: "Metallica", icon: MessageSquare, path: "/chat", badge: null },
-  { id: "dashboard", label: "Dashboard", icon: BarChart3, path: "/", badge: null },
+  { id: "dashboard", label: "Dashboard", icon: BarChart3, path: "/dashboard", badge: null },
   { id: "screener", label: "Asset Finder", icon: BarChart2, path: "/screener", badge: null },
   { id: "news", label: "Insights", icon: FileText, path: "/news", badge: "DEMO" },
   { id: "trends", label: "Forecasts", icon: TrendingUp, path: "/trends", badge: "DEMO" },
