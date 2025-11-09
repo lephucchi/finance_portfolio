@@ -35,16 +35,29 @@ USER airflow
 # Copy .env file if it exists
 COPY --chown=airflow:root .env* ./
 
+# Use Airflow constraints file to avoid dependency hell
+ENV AIRFLOW_VERSION=2.7.1
+ENV PYTHON_VERSION=3.9
+ENV CONSTRAINT_URL="https://raw.githubusercontent.com/apache/airflow/constraints-${AIRFLOW_VERSION}/constraints-${PYTHON_VERSION}.txt"
+
 # Copy requirements if needed
 COPY requirements.txt /requirements.txt
-RUN pip install --no-cache-dir -r /requirements.txt || true
 
-# Install RAG System dependencies explicitly
-RUN pip install --no-cache-dir \
+# Install packages with constraints
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r /requirements.txt --constraint "${CONSTRAINT_URL}" || true
+
+# Install RAG System dependencies explicitly with constraints
+RUN pip install --no-cache-dir --constraint "${CONSTRAINT_URL}" \
     sentence-transformers>=2.2.0 \
     faiss-cpu>=1.7.4 \
     torch>=2.0.0 \
-    pyarrow>=14.0.0
+    pyarrow>=14.0.0 || \
+    pip install --no-cache-dir \
+    sentence-transformers \
+    faiss-cpu \
+    torch \
+    pyarrow
 
 # Set Spark configurations
 ENV SPARK_CONF_DIR=$SPARK_HOME/conf

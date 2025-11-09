@@ -1,0 +1,61 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs and temp files
+*.log
+logs/
+*.tmp
+
+# Airflow logs (can cause permission issues)
+airflow/logs/scheduler/latest
+airflow/logs/dag_processor_manager/
+airflow/logs/**/*.log
+
+# Node modules
+node_modules/
+**/node_modules/
+
+# Environment files (will be mounted via volumes)
+.env
+.env.local
+.env.*.local
+
+# Git
+.git/
+.gitignore
+
+# Data files (too large for build context)
+*.csv
+*.parquet
+*.db
+*.sqlite
+data/
+dataset/
+*.faiss
+*.npy
+
+# Documentation
+*.md
+docs/
