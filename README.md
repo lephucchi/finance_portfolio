@@ -109,6 +109,13 @@ Three-layer data organization for optimal efficiency:
 
 ### System Architecture Overview
 
+<div align="center">
+  <img src="./images/diagram.png" alt="AEGIS LUMINA System Architecture Diagram" width="100%">
+  <p><i>Complete end-to-end data flow from ingestion to visualization</i></p>
+</div>
+
+The system follows a **modern data lakehouse architecture** with automated ETL pipelines:
+
 ```
 DATA SOURCES
   ├─ VNStock API (30 stocks)
