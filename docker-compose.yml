@@ -27,8 +27,8 @@ x-airflow-common:
     AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
     AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-ap-southeast-1}
     AWS_S3_BUCKET: ${S3_BUCKET:-bankanalystportfolio}
-    # Python path
-    PYTHONPATH: '/opt/airflow/finance_portfolio'
+    # Python path (include Spark Python for PySpark)
+    PYTHONPATH: '/opt/spark/python:/opt/spark/python/lib/py4j-0.10.9.7-src.zip:/opt/airflow/finance_portfolio'
     # Spark configurations
     SPARK_HOME: '/opt/spark'
     JAVA_HOME: '/usr/lib/jvm/java-17-openjdk-amd64'

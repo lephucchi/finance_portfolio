@@ -1,5 +1,5 @@
 # Custom Airflow image with Spark and vnstock dependencies
-FROM apache/airflow:2.7.1-python3.9
+FROM apache/airflow:2.7.1-python3.10
 
 # Install system dependencies
 USER root
@@ -35,31 +35,24 @@ USER airflow
 # Copy .env file if it exists
 COPY --chown=airflow:root .env* ./
 
+# Install PySpark directly without constraints (critical for DAGs)
+RUN pip install --no-cache-dir pyspark==3.5.0 py4j==0.10.9.7
+
 # Use Airflow constraints file to avoid dependency hell
 ENV AIRFLOW_VERSION=2.7.1
-ENV PYTHON_VERSION=3.9
+ENV PYTHON_VERSION=3.10
 ENV CONSTRAINT_URL="https://raw.githubusercontent.com/apache/airflow/constraints-${AIRFLOW_VERSION}/constraints-${PYTHON_VERSION}.txt"
 
-# Copy requirements if needed
-COPY requirements.txt /requirements.txt
+# Install only pyarrow for Spark compatibility (RAG dependencies moved to backend)
+RUN pip install --no-cache-dir pyarrow>=14.0.0
 
-# Install packages with constraints
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r /requirements.txt --constraint "${CONSTRAINT_URL}" || true
-
-# Install RAG System dependencies explicitly with constraints
-RUN pip install --no-cache-dir --constraint "${CONSTRAINT_URL}" \
-    sentence-transformers>=2.2.0 \
-    faiss-cpu>=1.7.4 \
-    torch>=2.0.0 \
-    pyarrow>=14.0.0 || \
-    pip install --no-cache-dir \
-    sentence-transformers \
-    faiss-cpu \
-    torch \
-    pyarrow
+# Install vnstock3 for Vietnamese stock data
+RUN pip install --no-cache-dir vnstock3>=3.2.0
 
 # Set Spark configurations
 ENV SPARK_CONF_DIR=$SPARK_HOME/conf
 ENV PYSPARK_PYTHON=python3
 ENV PYSPARK_DRIVER_PYTHON=python3
+
+# Re-set PYTHONPATH to ensure PySpark is available (Airflow may override it)
+ENV PYTHONPATH=/opt/spark/python:/opt/spark/python/lib/py4j-0.10.9.7-src.zip:${PYTHONPATH}
